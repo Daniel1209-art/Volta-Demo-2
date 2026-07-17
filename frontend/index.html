@@ -955,9 +955,17 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 /* ── COMPACT — phones (portrait ≤767px): fit-to-viewport column, lamp centred in
       the flexible middle, bet + ON/OFF always visible at the bottom ── */
 @media(max-width:767px){
-  .app{height:100dvh;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+  /* height:100dvh keeps the fit-to-viewport goal, but the column below may NOT
+     be clipped: on tall phones (844/926 CSS-px) the visible height with the
+     address bar shown is the SMALL viewport (svh) — less than 100dvh — so a
+     hidden-overflow column used to cut off / collide the ON/OFF and BET
+     controls. The column now scrolls whenever content exceeds the visible
+     viewport instead of clipping; when everything fits, nothing changes. */
+  .app{height:100dvh;min-height:100svh;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
   /* tighter gaps between blocks → more room for the lamp and buttons */
-  .main-content{flex:1;min-height:0;overflow:hidden;gap:clamp(6px,1.1vh,12px);padding-inline:var(--gutter)}
+  .main-content{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+    gap:clamp(6px,1.1vh,12px);padding-inline:var(--gutter)}
   .game-zone{flex:1;min-height:0;gap:clamp(4px,.9vh,9px)}
   .volt-zone,.wire-bridge,.start-timer{flex:0 0 auto}
   /* lamp + personal-× fill the lamp card and never spill onto the controls:
@@ -987,11 +995,9 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .hist-bar{padding:6px 12px}
   .wire-bridge{--wire:clamp(18px,2.4vh,28px)}
 }
-/* short phones (e.g. 320×568, 360×640): let the play column scroll rather than
-   ever clip — header stays put, nothing is cut off, still no horizontal scroll */
-@media(max-width:767px) and (max-height:700px){
-  .main-content{overflow-y:auto;-webkit-overflow-scrolling:touch}
-}
+/* (fix) the old ≤700px-only scroll fallback is gone: .main-content above now
+   scrolls on EVERY portrait phone whenever the column is taller than the
+   visible (svh) viewport — tall phones with the address bar shown included */
 
 /* ── TWO-COLUMN — tablets (≥768) and any landscape below desktop: lamp left,
       controls right, fit-to-viewport. Also covers portrait tablets/2-in-1s at

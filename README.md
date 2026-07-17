@@ -1,12 +1,14 @@
 # VOLTA Demo — Lamp Game
 
 Crash-игра «лампа»: зажги лампу, дай множителю расти, выключи **до** того, как
-колба перегорит. Статический прототип: чистый HTML5 + CSS + vanilla JS в одном
-файле, без фреймворков, сборщиков и бэкенда. Честность раундов — provably-fair
-на Web Crypto API (`crypto.subtle`, HMAC-SHA256).
+колба перегорит. Фронтенд — чистый HTML5 + CSS + vanilla JS (без фреймворков);
+бэкенд — Node.js: **раунды генерирует сервер**, у всех игроков один общий
+честный таймлайн. Provably fair: HMAC-SHA256, хэш раунда публикуется до
+старта, seed раскрывается после краша и проверяется клиентом.
 
-> ⚠️ Это **демо-симуляция**: баланс, сиды и выплаты считаются в браузере.
-> Для игры на реальные деньги обязателен серверный движок и лицензия.
+> ⚠️ Это **демо на игровые деньги**: баланс игрока живёт в браузере, платежей
+> и выводов нет. Для игры на реальные деньги обязательны серверный кошелёк
+> и лицензия.
 
 **Прод:** <https://volta-demo.com>
 
@@ -14,58 +16,83 @@ Crash-игра «лампа»: зажги лампу, дай множителю 
 
 | Слой | Технология |
 |------|-----------|
-| Игра | один файл `frontend/index.html` (разметка + стили + движок) |
-| Звук | Web Audio API: эффекты `frontend/sounds/*.wav`, музыка `frontend/Music/*.mp3` |
-| Честность | Web Crypto API (`crypto.subtle`) — работает только в secure context (HTTPS или localhost) |
-| Хостинг | Hetzner Cloud, Ubuntu 24.04, nginx, Let's Encrypt |
+| Игра | один файл `frontend/index.html` (разметка + стили + движок UI) |
+| Общая математика | `shared/engine.js` — один модуль для клиента и сервера (кривая роста, crash-point, константы) |
+| Бэкенд | Node.js ≥ 22.5 (`backend/server.js`): game-loop, WebSocket `/ws`, зависимость только `ws` |
+| Хранилище | SQLite через встроенный `node:sqlite` (без нативных модулей): ники, раунды, ставки за день |
+| Звук | Web Audio API: `frontend/sounds/*.wav`, музыка `frontend/Music/*.mp3` |
+| Хостинг | Hetzner Cloud, Ubuntu 24.04, nginx (статика + wss-прокси), Let's Encrypt, systemd |
 
 ## Быстрый старт (локально)
 
 ```bash
-# любой статик-сервер из папки frontend/
-npx serve frontend        # → http://localhost:3000
-# или
-python -m http.server 8000 --directory frontend
+cd backend && npm ci && cd ..
+SERVE_STATIC=1 node backend/server.js     # → http://localhost:8090
 ```
 
-Открывать через `http://localhost:...` — localhost считается secure context,
-поэтому `crypto.subtle` доступен. Запуск двойным кликом (`file://`) **не
-работает**: Web Crypto в этом режиме недоступен.
+Бэкенд в dev-режиме сам отдаёт статику и `shared/` — отдельный статик-сервер
+не нужен. `localhost` — secure context, так что Web Crypto доступен.
+Запуск двойным кликом (`file://`) не поддерживается.
+
+Тесты (общий таймлайн, provably fair, персистентность):
+
+```bash
+node backend/test-sync.js
+```
 
 ## Структура репозитория
 
 ```
 volta-demo/
-├── frontend/              # корень статики — деплоится на сервер как есть
-│   ├── index.html         # игра целиком (точка входа)
+├── frontend/              # статика — корень nginx
+│   ├── index.html         # игра целиком (UI + WebSocket-клиент)
 │   ├── Music/             # фоновые треки .mp3 (пути захардкожены в index.html)
 │   └── sounds/            # звуковые эффекты .wav (аналогично)
+├── shared/
+│   └── engine.js          # общая crash-математика клиента и сервера (не менять!)
+├── backend/
+│   ├── server.js          # game-loop + WebSocket + SQLite
+│   ├── test-sync.js       # интеграционный тест приёмки
+│   └── .env.example       # конфиг (PORT, RESET_TZ, …) — секретов нет
 ├── deploy/
-│   ├── nginx/volta-demo.conf   # server-block: статика, gzip, кеш, security-заголовки
-│   └── deploy.sh               # обновление сайта на сервере (git pull + права + reload)
+│   ├── nginx/volta-demo.conf    # статика + прокси /ws, /api, /shared (TLS certbot)
+│   ├── volta-backend.service    # systemd-юнит бэкенда
+│   └── deploy.sh                # деплой одной командой (pull → npm ci → restart → reload)
 ├── docs/
-│   ├── deployment.md      # как развёрнут прод: DNS, nginx, certbot
+│   ├── deployment.md      # как развёрнут прод: DNS, Node, nginx, certbot, systemd
 │   └── runbook.md         # эксплуатация: перезапуск, логи, сертификат, бэкап
 ├── LICENSE                # проприетарная — использование без разрешения запрещено
 └── README.md
 ```
 
-> Папки `Music/` и `sounds/` намеренно лежат рядом с `index.html` и не
-> переименованы: пути к ним зашиты в коде игры (`fetch('sounds/…')`,
-> `'Music/' + track + '.mp3'`).
+## Как это работает (коротко)
+
+1. Сервер держит вечный цикл: `STARTING` (5 с, ставки открыты) →
+   `IN_PROGRESS` → краш → пауза 3 с → следующий раунд.
+2. До старта раунда клиенты получают `sha256(serverSeed)`; сам seed и
+   crash-point остаются на сервере (клиент не может знать исход заранее).
+3. Множитель клиент считает локально той же `growthFunc`, но от серверного
+   `startTime` с поправкой на рассинхрон часов — у всех одно значение.
+4. В момент краша сервер раскрывает seed; клиент проверяет provably fair.
+5. Лидерборд — реально подключённые игроки (ник `Volta-gamer#####`,
+   стабилен между заходами) плюс боты-заполнители в том же формате ников.
+6. «My Game History» (кнопка-ник над лидербордом) — свои ставки за сегодня;
+   сброс раз в сутки (UTC, настраивается `RESET_TZ`), хранится в SQLite
+   и переживает рестарт сервера.
 
 ## Деплой
 
 Кратко (подробности — в [docs/deployment.md](docs/deployment.md)):
 
-1. Код живёт в `/var/www/volta-demo.com` на сервере (git clone этого репозитория).
-2. nginx отдаёт `/var/www/volta-demo.com/frontend` как статику — конфиг
-   в [deploy/nginx/volta-demo.conf](deploy/nginx/volta-demo.conf).
-3. HTTPS — Let's Encrypt (certbot), автопродление через `certbot.timer`.
-4. Обновление: `bash deploy/deploy.sh` на сервере (git pull + reload).
+```bash
+ssh root@178.104.35.183 "bash /var/www/volta-demo.com/deploy/deploy.sh"
+```
+
+Скрипт сам: подтянет git, поставит зависимости, обновит systemd-юнит и
+nginx-конфиг из репозитория, перезапустит бэкенд и мягко перезагрузит nginx.
 
 ## Происхождение
 
-Код перенесён 1-в-1 из монолитного прототипа `VOLTA4-3D.html`: геймплей,
-тайминги, звук и вероятности не менялись — файл только переименован в
-`index.html`, ассеты скопированы без изменений.
+Код перенесён из монолитного прототипа `VOLTA4-3D.html`: геймплей, тайминги,
+звук, вероятности и RTP (~96.5–97.5%) не менялись — математика вынесена в
+общий модуль, генерация раундов переехала на сервер.

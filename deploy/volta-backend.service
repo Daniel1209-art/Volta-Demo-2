@@ -1,0 +1,28 @@
+# systemd-юнит бэкенда VOLTA. deploy.sh копирует его в
+# /etc/systemd/system/volta-backend.service и перезапускает сервис.
+# Автозапуск при загрузке + рестарт при падении.
+[Unit]
+Description=VOLTA game backend (shared round timeline, WebSocket)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/volta-demo.com/backend
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=DB_PATH=/var/www/volta-demo.com/data/volta.db
+# .env (необязательный) может переопределить PORT/RESET_TZ и т.д.
+EnvironmentFile=-/var/www/volta-demo.com/backend/.env
+
+# минимальная изоляция
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/www/volta-demo.com/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,17 @@
 # Деплой volta-demo.com
 
 Прод: Hetzner Cloud, Ubuntu 24.04 LTS, `root@178.104.35.183` (IPv6
-`2a01:4f8:1c19:e191::1`). Статика отдаётся host-nginx, TLS — Let's Encrypt.
+`2a01:4f8:1c19:e191::1`). Статику отдаёт host-nginx, TLS — Let's Encrypt,
+бэкенд — Node-сервис под systemd (`volta-backend`), наружу не выставлен:
+nginx проксирует `/ws` (WebSocket) и `/api` на `127.0.0.1:8090`.
+
+## 0. Обновление уже развёрнутого прода — одна команда
+
+```bash
+ssh root@178.104.35.183 "bash /var/www/volta-demo.com/deploy/deploy.sh"
+```
+
+Всё, что ниже, — первичная настройка с нуля.
 
 ## 1. DNS (Cloudflare, режим DNS only — серое облачко)
 
@@ -12,75 +22,73 @@
 | A    | www | 178.104.35.183          | DNS only |
 | AAAA | www | 2a01:4f8:1c19:e191::1   | DNS only |
 
-Проверка перед выпуском сертификата:
+Проверка перед выпуском сертификата: `dig +short volta-demo.com A` должен
+вернуть IP сервера. Пока не вернул — certbot не запускать.
 
-```bash
-dig +short volta-demo.com A
-dig +short volta-demo.com AAAA
-dig +short www.volta-demo.com A
-```
-
-Все ответы должны указывать на IP сервера. Пока не указывают — certbot не запускать.
-
-## 2. Пакеты на сервере
+## 2. Пакеты
 
 ```bash
 apt update && apt upgrade -y
 apt install -y nginx git certbot python3-certbot-nginx
 ```
 
+### Node.js (нужен ≥ 22.5; ставим 24 LTS через NodeSource)
+
+В репозиториях Ubuntu 24.04 только Node 18 — он не подходит (бэкенд
+использует встроенный `node:sqlite`). Ставим NodeSource:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+apt install -y nodejs
+node --version   # v24.x
+```
+
 ## 3. Код сайта
 
-Репозиторий приватный, поэтому на сервере используется deploy key (SSH-ключ
-только на чтение, добавляется в GitHub → Settings → Deploy keys репозитория):
+Репозиторий приватный — на сервере используется deploy key (SSH-ключ только
+на чтение; добавляется в GitHub → репозиторий → Settings → Deploy keys):
 
 ```bash
 ssh-keygen -t ed25519 -f /root/.ssh/volta_deploy -N "" -C "deploy@volta-demo.com"
-cat /root/.ssh/volta_deploy.pub   # этот ключ добавить в Deploy keys на GitHub
-```
+cat /root/.ssh/volta_deploy.pub    # → в Deploy keys на GitHub
+printf 'Host github.com-volta\n    HostName github.com\n    IdentityFile /root/.ssh/volta_deploy\n    IdentitiesOnly yes\n' >> /root/.ssh/config
 
-`/root/.ssh/config`:
-
-```
-Host github.com-volta
-    HostName github.com
-    IdentityFile /root/.ssh/volta_deploy
-```
-
-Клонирование и права:
-
-```bash
 git clone git@github.com-volta:Daniel1209-art/Volta-Demo-2.git /var/www/volta-demo.com
-chown -R www-data:www-data /var/www/volta-demo.com
 ```
 
-## 4. nginx
+## 4. Первый запуск
 
 ```bash
-cp /var/www/volta-demo.com/deploy/nginx/volta-demo.conf /etc/nginx/sites-available/
-ln -s /etc/nginx/sites-available/volta-demo.conf /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+bash /var/www/volta-demo.com/deploy/deploy.sh
 ```
 
-Проверка: `http://volta-demo.com` должен отдавать игру (Web Crypto по http ещё
-не работает — это нормально, чинится следующим шагом).
+Скрипт установит зависимости, положит systemd-юнит и nginx-конфиг из
+репозитория, поднимет сервис и перезагрузит nginx. Если сертификата ещё
+нет — сначала временно поставить HTTP-конфиг без ssl-блоков и выпустить
+сертификат (шаг 5), потом повторить `deploy.sh`.
 
 ## 5. HTTPS
 
 ```bash
 certbot --nginx -d volta-demo.com -d www.volta-demo.com \
   --redirect -m kkornienko1601@gmail.com --agree-tos --no-eff-email
-```
-
-Автопродление ставится из коробки, проверка:
-
-```bash
-systemctl status certbot.timer
+systemctl status certbot.timer      # автопродление активно
 certbot renew --dry-run
 ```
 
-## 6. Обновление кода
+`deploy/nginx/volta-demo.conf` в репозитории уже содержит certbot-блоки —
+после выпуска сертификата конфиг из репозитория полностью совпадает с боевым.
 
-```bash
-bash /var/www/volta-demo.com/deploy/deploy.sh
+## 6. Архитектура прода
+
 ```
+браузер ── https ──> nginx ──> frontend/ (статика: index.html, звуки, музыка)
+        └─ wss /ws ─>  │  ──> 127.0.0.1:8090  volta-backend (systemd, www-data)
+                       │        └─> /var/www/volta-demo.com/data/volta.db (SQLite)
+                       └──> /shared/engine.js (общий движок, alias)
+```
+
+- Бэкенд слушает только localhost; наружу — только через nginx (wss).
+- `data/` не в git; это единственное место с состоянием (ники, раунды,
+  ставки за день). Суточный сброс истории — `RESET_TZ` (по умолчанию UTC).
+- Конфиг бэкенда: `backend/.env` (см. `.env.example`), секретов нет.

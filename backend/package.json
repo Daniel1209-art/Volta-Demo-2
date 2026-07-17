@@ -1,0 +1,18 @@
+{
+  "name": "volta-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VOLTA demo game server: shared round timeline over WebSocket, SQLite persistence",
+  "main": "server.js",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "SERVE_STATIC=1 node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

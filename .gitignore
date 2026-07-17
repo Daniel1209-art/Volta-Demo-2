@@ -16,3 +16,10 @@ desktop.ini
 *.pem
 *.key
 id_rsa*
+
+# Бэкенд: зависимости и локальная база (создаются на месте)
+node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm

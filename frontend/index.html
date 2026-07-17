@@ -1,0 +1,2861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOLTA — Lamp Game · 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050507;--s1:#0a0a0f;--s2:#0f0f18;--s3:#14141f;
+  --brd:rgba(168,85,247,.1);--brd2:rgba(168,85,247,.22);
+  --txt:#ece8f8;--t2:rgba(236,232,248,.5);--t3:rgba(236,232,248,.26);
+  --p:#a855f7;--p2:rgba(168,85,247,.18);--p3:rgba(168,85,247,.08);
+  --pk:#e879f9;--pk2:rgba(232,121,249,.14);
+  --g:#34d399;--g2:rgba(52,211,153,.16);
+  --r:#f87171;--r2:rgba(248,113,113,.15);
+  --b:#818cf8;--b2:rgba(129,140,248,.15);
+  --gold:#fbbf24;
+  --rad:14px;--rad-sm:10px;
+
+  /* ════ RESPONSIVE SYSTEM (v12) — one fluid scale, no layout magic numbers ════ */
+  --shell-max:100vw;                  /* игра всегда на всю ширину экрана */
+  --gutter:clamp(10px,1.6vw,18px);    /* небольшой зазор от края экрана */
+  --gap:clamp(8px,1.5vw,16px);        /* gap between zones */
+  --tap:44px;                         /* minimum touch target */
+
+  /* voltage-scale widths + wire — fluid (were fixed px) */
+  --bat-w:clamp(56px,15vw,120px);
+  --recv-w:clamp(90px,22vw,190px);
+  --wire:clamp(30px,4.2vh,54px);
+
+  /* fluid type scale — every text size derives from these */
+  --fs-eyebrow:clamp(8px,1.7vw,9px);  /* micro uppercase labels */
+  --fs-label:clamp(9px,1.8vw,11px);
+  --fs-sm:clamp(11px,1.5vw,13px);
+  --fs-md:clamp(12.5px,1.6vw,15px);
+  --fs-lg:clamp(14px,1.4vw,18px);
+  --fs-logo:clamp(18px,2.4vw,24px);
+  --fs-mult:clamp(28px,7vw,54px);     /* big global multiplier */
+  --fs-pers:clamp(17px,4vw,26px);     /* personal × — компактнее: приоритет у лампы */
+  --fs-bet:clamp(20px,5.4vw,28px);    /* bet amount */
+  --fs-lbtn:clamp(18px,4.4vw,26px);   /* ON / OFF label */
+
+  /* the lamp — hero element; scales from BOTH axes so it never dwarfs the buttons
+     nor gets lost in a wide column, capped at both ends */
+  --lamp:clamp(150px,min(70vw,44vh),500px);
+  /* theme hooks */
+  --font-main:'Jost','Montserrat',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-display:var(--font-main);
+  --surface:linear-gradient(160deg,var(--s1),var(--s2));
+  --surface-volt:linear-gradient(135deg,var(--s1),var(--s2));
+  --glow-p:color-mix(in srgb,var(--p) 55%,transparent);
+  --glow-pk:color-mix(in srgb,var(--pk) 70%,transparent);
+  --glow-g:color-mix(in srgb,var(--g) 45%,transparent);
+  --lamp-glass:#0c0916;--lamp-socket:#0e0a18;--lamp-socket2:#0b0814;
+  --lamp-line:color-mix(in srgb,var(--p) 46%,transparent);
+  --lamp-glow:color-mix(in srgb,var(--p) 38%,transparent);
+  --btn-grad:linear-gradient(135deg,var(--p),var(--pk));
+  --on-bg:color-mix(in srgb,var(--g) 18%,transparent);
+  --on-brd:color-mix(in srgb,var(--g) 40%,transparent);
+  --off-bg:color-mix(in srgb,var(--p) 16%,transparent);
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+html,body{background:var(--bg);color:var(--txt);
+  font-family:var(--font-main);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
+
+.vis-toggle{position:absolute;width:0;height:0;opacity:0;pointer-events:none;margin:0}
+
+.app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;padding-bottom:28px;
+  width:100%;min-width:320px;max-width:var(--shell-max);margin-inline:auto;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px)}
+
+/* HISTORY BAR */
+.hist-bar{width:100%;background:linear-gradient(180deg,color-mix(in srgb,var(--p) 7%,transparent) 0%,transparent);
+  border-bottom:1px solid var(--brd);padding:8px 14px;
+  display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
+.hist-bar::-webkit-scrollbar{display:none}
+.hist-lbl{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;
+  white-space:nowrap;flex-shrink:0;font-weight:600}
+.hc{flex-shrink:0;font-size:var(--fs-sm);font-weight:600;padding:4px 12px;border-radius:20px}
+.hc-l{background:var(--g2);color:var(--g)}
+.hc-m{background:var(--b2);color:var(--b)}
+.hc-h{background:var(--p2);color:var(--p)}
+.hc-b{background:var(--r2);color:var(--r)}
+
+/* HEADER */
+.hdr{width:100%;padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-wm{display:inline-flex;align-items:center;gap:.01em;
+  font-family:var(--font-display);font-weight:800;font-size:var(--fs-logo);
+  letter-spacing:.12em;color:var(--gold);line-height:1}
+.wm-o{display:inline-flex;align-items:center;justify-content:center;
+  width:.84em;height:.84em;flex-shrink:0;margin:0 .01em}
+.wm-o svg{width:100%;height:100%;overflow:visible}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.info-btn{width:36px;height:36px;border-radius:50%;
+  background:var(--p3);border:1px solid var(--brd2);
+  color:var(--p);font-size:16px;font-style:italic;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:background .15s,box-shadow .15s,transform .1s;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.info-btn:hover{background:var(--p);color:#fff;box-shadow:0 0 12px var(--glow-p)}
+.info-btn:active{transform:scale(.9);background:var(--p);color:#fff}
+.info-btn svg,.info-btn svg *{pointer-events:none}
+.lb-open-btn svg{width:16px;height:16px}
+.bal-chip{background:var(--p3);border:1px solid var(--brd);
+  border-radius:var(--rad-sm);padding:6px 12px;text-align:right}
+.bal-lbl{font-size:9px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
+.bal-val{font-size:var(--fs-md);font-weight:700;color:var(--g)}
+
+/* ── ПАНЕЛЬ ЗВУКА — кнопка-динамик в шапке + всплывающее окно настроек ── */
+/* иконка динамика чуть меньше остальных значков шапки */
+.info-btn .snd-ico{width:13px;height:13px}
+.snd-pop{position:fixed;top:clamp(70px,10vh,96px);right:max(10px,env(safe-area-inset-right,0px));
+  z-index:1250;width:min(240px,calc(100vw - 20px));
+  background:var(--s1);border:1px solid var(--brd2);border-radius:var(--rad);
+  padding:13px 15px;display:flex;flex-direction:column;gap:12px;
+  max-height:min(72vh,520px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;
+  box-shadow:0 16px 44px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;transform:translateY(-8px);
+  transition:opacity .18s var(--ease),transform .18s var(--ease)}
+#sndToggle:checked ~ .snd-pop{opacity:1;pointer-events:auto;transform:none}
+.snd-backdrop{position:fixed;inset:0;z-index:1240;pointer-events:none;background:transparent}
+#sndToggle:checked ~ .snd-backdrop{pointer-events:auto;cursor:default}
+.snd-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px}
+.snd-name{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--t2);font-weight:600}
+.snd-range{-webkit-appearance:none;appearance:none;flex:1 1 auto;min-width:0;max-width:120px;
+  height:4px;border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,var(--p) var(--vfill,80%),var(--s3) var(--vfill,80%))}
+.snd-range::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--p);box-shadow:0 0 8px var(--glow-p);cursor:pointer}
+.snd-range::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--p);border:none;cursor:pointer}
+.snd-sep{height:1px;background:var(--brd);flex-shrink:0}
+/* выпадающий список выбора трека */
+.snd-select{flex:1 1 auto;min-width:0;max-width:150px;background:var(--s2);border:1px solid var(--brd2);
+  border-radius:8px;color:var(--txt);font-family:inherit;font-size:11px;font-weight:600;
+  padding:6px 26px 6px 10px;cursor:pointer;outline:none;transition:border-color .12s;
+  -webkit-appearance:none;appearance:none;text-overflow:ellipsis;
+  background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23a855f7' stroke-width='1.6'><path d='M1 1l4 4 4-4'/></svg>");
+  background-repeat:no-repeat;background-position:right 9px center}
+.snd-select:hover,.snd-select:focus-visible{border-color:var(--p)}
+.snd-select option{background:var(--s1);color:var(--txt)}
+/* тумблер музыки dimmed, когда музыка выключена — заглушать выбор трека не нужно */
+.snd-pop.mus-off .snd-select{opacity:.5}
+
+/* MAIN */
+.main-content{display:flex;flex-direction:column;gap:8px;padding:0 12px;flex:1}
+.game-zone{position:relative;display:flex;flex-direction:column}
+
+/* VOLT ZONE */
+.volt-zone{display:flex;align-items:stretch;min-height:58px;background:var(--surface-volt);
+  border:1px solid var(--brd);border-radius:var(--rad);overflow:hidden;position:relative}
+.volt-zone::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 50% 60% at 50% 0%,color-mix(in srgb,var(--p) 6%,transparent),transparent);
+  pointer-events:none}
+.bat-block{width:var(--bat-w);flex-shrink:0;background:linear-gradient(180deg,var(--s2),var(--s3));
+  border-right:1px solid var(--brd);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;gap:4px}
+.bat-body{color:var(--p)}
+.bat-block svg{width:30px;height:44px}
+.bat-connector{width:2px;height:8px;margin:0 auto;
+  background:linear-gradient(180deg,var(--p),var(--pk));box-shadow:0 0 8px var(--glow-p)}
+.curr-track{flex:1;position:relative;overflow:hidden;min-height:58px;
+  display:flex;flex-direction:column;justify-content:center;padding:0 8px}
+.curr-label{font-size:8px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;
+  position:absolute;top:8px;left:12px}
+/* МОЛНИЯ МЕЖДУ РАЗЪЁМАМИ — из блока батареи и блока множителя торчат
+   кабельные разъёмы (изоляция + медный наконечник); во время раунда между
+   ними бьёт молния. 8 форм разряда, JS (boltTick) перебирает их поочерёдно
+   и ускоряет смену с ростом общего множителя */
+.wire-wrap{position:relative;height:26px}
+.arc-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.arc-base{stroke:color-mix(in srgb,var(--p) 15%,transparent);stroke-width:1.6;fill:none}
+.bolt{opacity:0}
+.bolt.on{opacity:1;animation:boltJit .12s steps(2,end) infinite}
+@keyframes boltJit{50%{opacity:.8;transform:translateY(.6px)}}
+/* белое ядро разряда + цветные нити и ответвления (тесловский пучок) */
+.b-core{fill:none;stroke:#fff;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;
+  filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 7px var(--m-color))}
+.b-br{fill:none;stroke-linejoin:round;stroke-linecap:round;stroke-width:.9;opacity:.7;
+  filter:drop-shadow(0 0 3px currentColor)}
+.b-br.br-pk{stroke:var(--pk);color:var(--pk)}
+.b-br.br-b{stroke:var(--b);color:var(--b)}
+.b-br.br-w{stroke:rgba(255,255,255,.8);color:#fff;stroke-width:.7;opacity:.5}
+/* искра на контактах разъёмов, пока идёт ток */
+.tip-spark{fill:#fff;opacity:0;filter:drop-shadow(0 0 4px var(--m-color))}
+.volt-zone.live .tip-spark{opacity:1;animation:tipPulse .5s ease-in-out infinite alternate}
+@keyframes tipPulse{from{opacity:.5;r:1.7}to{opacity:1;r:2.6}}
+.recv-block{width:var(--recv-w);flex-shrink:0;background:linear-gradient(180deg,var(--s2),var(--s3));
+  border-left:1px solid var(--brd);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 12px;position:relative}
+.recv-block::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%,color-mix(in srgb,var(--p) 6%,transparent),transparent);
+  pointer-events:none}
+.recv-mult{font-size:var(--fs-mult);font-weight:800;color:var(--txt);font-family:var(--font-display);
+  font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.03em;text-shadow:0 0 30px var(--glow-p);white-space:nowrap}
+
+/* WIRE */
+/* точка спуска провода (--wire-x) выставляется из JS точно под центр лампы —
+   провод приходит к зоне узлов НАПРОТИВ лампы при любой раскладке */
+.wire-bridge{position:relative;width:100%;height:var(--wire);flex-shrink:0;--wire-x:50%}
+.wire-bridge i{position:absolute;border-radius:2px;background:linear-gradient(var(--p),var(--pk));
+  box-shadow:0 0 8px var(--glow-p);animation:wirePulse 2s ease-in-out infinite alternate}
+.wire-v1{left:calc(var(--bat-w)/2);top:-4px;width:2px;height:calc(50% + 4px);transform:translateX(-1px)}
+.wire-h{left:calc(var(--bat-w)/2);width:calc(var(--wire-x) - var(--bat-w)/2);top:50%;height:2px;transform:translateY(-1px)}
+.wire-v2{left:var(--wire-x);top:50%;bottom:-4px;width:2px;transform:translateX(-1px);animation-delay:.4s}
+.wire-node{position:absolute;left:var(--wire-x);bottom:-4px;width:7px;height:7px;border-radius:50%;
+  transform:translate(-50%,50%);background:var(--pk);box-shadow:0 0 10px var(--glow-pk);
+  animation:wirePulse 2s ease-in-out infinite alternate}
+@keyframes wirePulse{
+  from{box-shadow:0 0 5px var(--glow-p);opacity:.8}
+  to{box-shadow:0 0 14px var(--glow-pk);opacity:1}}
+
+/* LAMP */
+.lamp-card{width:100%;background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);
+  padding:12px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;overflow:visible}
+.lamp-card::after{content:'';position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+  width:80px;height:38px;border-radius:50%;background:var(--lamp-glow);filter:blur(16px);pointer-events:none}
+.lamp-outer{position:relative;width:var(--lamp);height:var(--lamp);display:flex;align-items:center;justify-content:center}
+.lamp-svg{width:66%;height:auto;aspect-ratio:88/104}
+/* радужное свечение = ОБВОДКА круглой зоны: кольцо вырезано маской по краю
+   круга (толщина в % радиуса), поэтому масштабируется вместе с зоной 1:1 */
+/* радужное свечение = обводка круга лампы (r=36 в 80 = 90% от полурадиуса).
+   Кольцо вырезано радиальной маской ЦЕЛИКОМ в процентах (closest-side) и мягко
+   растушёвано альфой — без пиксельного blur, поэтому масштабируется 1:1 с кругом
+   и никогда не выходит за его грани. */
+.lamp-ring-anim{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent,var(--p) 30%,var(--pk) 50%,var(--b) 70%,transparent);
+  animation:ring-spin 4s linear infinite;opacity:.5;
+  -webkit-mask:radial-gradient(closest-side,transparent 0 78%,rgba(0,0,0,.35) 84%,#000 88% 92%,rgba(0,0,0,.35) 96%,transparent 100%);
+  mask:radial-gradient(closest-side,transparent 0 78%,rgba(0,0,0,.35) 84%,#000 88% 92%,rgba(0,0,0,.35) 96%,transparent 100%)}
+@keyframes ring-spin{to{transform:rotate(360deg)}}
+/* ФИОЛЕТОВАЯ ЗОНА лампы: круглый диск-подложка внутри радужной обводки.
+   inset в % от квадратной lamp-outer → всегда идеальный круг, масштабируется
+   ровно с лампой и радужным кольцом (радиус 90% = контур кольца r=36). */
+.lamp-ring-mask{position:absolute;inset:5%;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 50% 42%,
+    color-mix(in srgb,var(--p) 13%,var(--s1)) 0%, var(--s1) 52%, #150a24 100%);
+  box-shadow:inset 0 0 26px rgba(0,0,0,.55),inset 0 2px 10px color-mix(in srgb,var(--p) 20%,transparent)}
+.lamp-ring-svg{position:absolute;inset:0;width:100%;height:100%}
+/* stacking only — sizing stays the fluid 66%/aspect-ratio rule above (line 186)
+   on every device; a later fixed 100×119px override used to win the cascade
+   here and lock the bulb at a flat pixel size on phone/tablet, unlike desktop
+   (which explicitly restored the fluid rule for itself further down) */
+.lamp-svg{position:relative;z-index:1}
+.lamp-info-col{display:flex;flex-direction:column;gap:4px;width:100%;align-items:center}
+.lamp-title{font-size:8px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase}
+.state-badge{font-size:var(--fs-sm);font-weight:700;padding:3px 12px;border-radius:20px;
+  background:var(--p2);color:var(--p);border:1px solid var(--brd2);
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.sw-row{display:flex;gap:4px}
+.sw{width:11px;height:11px;border-radius:50%;background:var(--s3);border:1.5px solid var(--brd2)}
+.sw.u{background:var(--p);border-color:var(--p);box-shadow:0 0 6px var(--glow-p)}
+.sw.a{background:var(--p3);border-color:var(--brd2)}
+.pers-box{min-width:clamp(116px,32vw,150px);background:var(--s2);border:1px solid var(--brd);
+  border-radius:var(--rad-sm);padding:4px 12px;text-align:center}
+.pers-lbl{font-size:8px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
+.pers-val{font-size:var(--fs-pers);font-weight:800;color:var(--gold);font-family:var(--font-display);
+  font-variant-numeric:tabular-nums;line-height:1.1}
+/* живой подсчёт выигрыша в деньгах — прямо в блоке личного множителя */
+.pers-pay{font-size:clamp(12px,3.2vw,15px);font-weight:800;font-variant-numeric:tabular-nums;
+  line-height:1.25;margin-top:1px;color:var(--g);letter-spacing:.01em;transition:color .2s;
+  text-shadow:0 0 14px color-mix(in srgb,var(--g) 45%,transparent)}
+.pers-pay.risk{color:var(--gold);text-shadow:0 0 14px color-mix(in srgb,var(--gold) 45%,transparent)}
+.pers-pay.idle{color:var(--t3);font-weight:600;text-shadow:none}
+@keyframes filGlow{
+  0%,100%{opacity:.88;filter:drop-shadow(0 0 3px currentColor)}
+  50%{opacity:1;filter:drop-shadow(0 0 12px currentColor)}}
+@keyframes glowPulse{0%,100%{opacity:.26}50%{opacity:.50}}
+.lamp-fil{animation:filGlow 1.9s ease-in-out infinite;will-change:filter;color:var(--p)}
+.lamp-glo{animation:glowPulse 2.1s ease-in-out infinite}
+
+/* CONTROLS */
+.controls{display:flex;flex-direction:column;gap:8px}
+.bet-zone{display:flex;flex-direction:column;gap:8px}
+.bet-card{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:9px 12px 11px}
+.zone-title{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.bet-inp-wrap{background:var(--s2);border:1px solid var(--brd2);border-radius:var(--rad-sm);
+  padding:8px 14px;display:flex;align-items:center;gap:6px;margin-bottom:7px;overflow:hidden}
+.bet-amount{font-size:var(--fs-bet);font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--font-display)}
+/* $ — префикс слева, не сжимается; число занимает остаток и усекается, а не наезжает на рамку */
+.bet-cur{font-size:clamp(15px,4vw,20px);font-weight:800;font-family:var(--font-display);
+  color:var(--t2);flex-shrink:0;line-height:1}
+.qrow{display:flex;gap:7px;margin-bottom:8px}
+.qb{flex:1;background:var(--s2);border:1px solid var(--brd);border-radius:10px;min-height:clamp(44px,6vh,50px);
+  color:var(--t2);font-size:var(--fs-sm);font-weight:600;padding:7px 4px;text-align:center;cursor:pointer;
+  transition:all .1s;touch-action:manipulation;display:flex;align-items:center;justify-content:center}
+.qb:hover{background:var(--s3);border-color:var(--brd2);color:var(--txt)}
+.qb:active{transform:scale(.96)}
+.bet-btn{width:100%;padding:clamp(12px,1.6vh,16px);min-height:var(--tap);border-radius:12px;border:none;background:var(--btn-grad);color:#fff;
+  font-size:var(--fs-md);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;
+  box-shadow:0 4px 22px var(--glow-p);transition:all .12s;touch-action:manipulation}
+.bet-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.bet-btn:active{transform:scale(.99)}
+.lamp-ctrl{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:14px;
+  display:flex;flex-direction:column;gap:10px}
+.lamp-ctrl .zone-title{display:none}
+.lamp-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1}
+.lbtn{padding:0 8px;border-radius:12px;border:none;font-size:var(--fs-lbtn);font-weight:900;font-family:var(--font-display);
+  letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .12s;min-height:clamp(52px,7.5vh,86px);touch-action:manipulation;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbtn-on{background:var(--on-bg);color:var(--g);border:1.5px solid var(--on-brd);box-shadow:0 4px 24px var(--glow-g)}
+.lbtn-on:hover{background:color-mix(in srgb,var(--g) 28%,transparent)}
+.lbtn-on:active{background:color-mix(in srgb,var(--g) 34%,transparent);transform:scale(.98)}
+.lbtn-off{background:var(--off-bg);color:var(--p);border:1.5px solid var(--brd2);box-shadow:0 4px 24px var(--glow-p)}
+.lbtn-off:hover{background:color-mix(in srgb,var(--p) 28%,transparent)}
+.lbtn-off:active{background:color-mix(in srgb,var(--p) 32%,transparent);transform:scale(.98)}
+
+/* AUTO */
+.auto-card{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:12px 14px}
+.auto-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.tog-track{width:36px;height:20px;border-radius:10px;background:color-mix(in srgb,var(--g) 20%,transparent);
+  border:1.5px solid var(--g);position:relative}
+.tog-knob{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--g);box-shadow:0 0 6px var(--glow-g)}
+.tog-lbl{font-size:11px;font-weight:600;color:var(--g)}
+.auto-grid{display:grid;gap:6px}
+.astage{background:var(--s2);border:1px solid var(--brd);border-radius:var(--rad-sm);
+  padding:7px 10px;display:grid;grid-template-columns:18px 1fr 1fr;gap:6px;align-items:center}
+.as-num{font-size:11px;font-weight:800;color:var(--p)}
+.as-field{display:flex;flex-direction:column;gap:4px}
+.as-lbl{font-size:7px;letter-spacing:.07em;text-transform:uppercase;font-weight:600}
+.as-lbl.off{color:var(--pk)}.as-lbl.on{color:var(--g)}
+.as-input{background:var(--s3);border:1px solid var(--brd);border-radius:7px;
+  color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;
+  padding:6px 9px;width:100%;outline:none;transition:border-color .15s;font-variant-numeric:tabular-nums}
+.as-input:focus{border-color:var(--brd2)}
+.as-input.off-in{border-color:color-mix(in srgb,var(--pk) 18%,transparent)}
+.as-input.off-in:focus{border-color:var(--pk)}
+.as-input.on-in{border-color:color-mix(in srgb,var(--g) 18%,transparent)}
+.as-input.on-in:focus{border-color:var(--g)}
+.auto-final{background:var(--p3);border:1px solid var(--brd2);border-radius:var(--rad-sm);padding:7px 10px;
+  display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;margin-top:6px}
+
+/* LEADERBOARD */
+.lb-col{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);overflow:hidden;
+  display:flex;flex-direction:column}
+.lb-handle{display:none;width:38px;height:4px;border-radius:2px;background:var(--brd2);margin:9px auto 3px;flex-shrink:0}
+.lb-close{display:none;position:absolute;top:9px;right:10px;width:30px;height:30px;
+  border-radius:50%;background:var(--s2);border:1px solid var(--brd);color:var(--t2);
+  font-size:16px;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;
+  z-index:3;line-height:1;transition:all .15s;user-select:none}
+.lb-close:hover{background:var(--r2);color:var(--r)}
+.lb-tabs{display:flex;border-bottom:1px solid var(--brd);flex-shrink:0}
+.lb-tab{flex:1;padding:10px;font-size:10px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--t3);background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;text-align:center;user-select:none}
+.lb-phase{display:none;flex-direction:column;flex:1;overflow:hidden}
+.lb-summary{padding:9px 12px;display:flex;align-items:center;justify-content:space-between;
+  background:var(--s2);border-bottom:1px solid var(--brd);flex-shrink:0}
+.lb-sum-item{display:flex;flex-direction:column;gap:1px}
+.lb-sum-val{font-size:15px;font-weight:700}
+.lb-sum-lbl{font-size:9px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
+.onoff-bar-wrap{padding:8px 12px;background:var(--s2);border-bottom:1px solid var(--brd);flex-shrink:0}
+.onoff-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.onoff-labels{display:flex;justify-content:space-between;font-size:10px;font-weight:600}
+/* two-colour ratio bar: turquoise = ON (fill), yellow = OFF (track) */
+.onoff-bar{height:5px;border-radius:3px;background:var(--gold);overflow:hidden;flex:1}
+.onoff-fill{height:100%;background:var(--g);border-radius:3px 0 0 3px;transition:width .3s var(--ease)}
+.onoff-on{color:var(--g)}.onoff-off{color:var(--gold)}
+.lb-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;overscroll-behavior:contain}
+.lb-list::-webkit-scrollbar{width:4px}
+.lb-list::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
+.lb-row{display:flex;align-items:center;justify-content:space-between;
+  padding:7px 12px;border-bottom:.5px solid var(--brd);transition:background .1s}
+.lb-row:hover{background:var(--s2)}.lb-row:last-child{border-bottom:none}
+.lb-left{display:flex;align-items:center;gap:7px;min-width:0;flex:1 1 auto}
+.lb-rank{font-size:9px;color:var(--t3);font-weight:600;width:14px;text-align:center;flex-shrink:0}
+.lb-ava{width:22px;height:22px;border-radius:50%;background:var(--btn-grad);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.lb-name{font-size:11px;color:var(--t2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-right{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;padding-left:8px}
+.lb-mult{font-size:11px;font-weight:700}
+.lb-meta{font-size:9px;color:var(--t3)}
+.on-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--g2);color:var(--g)}
+.off-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--pk2);color:var(--pk)}
+#phPre:checked ~ .lb-phase-1{display:flex}
+#phLive:checked ~ .lb-phase-2{display:flex}
+#phPre:checked ~ .lb-tabs .tab-pre,
+#phLive:checked ~ .lb-tabs .tab-live{color:var(--p);border-bottom-color:var(--p);background:var(--p3)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-backdrop{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 87%,transparent);cursor:pointer}
+.modal-box{background:var(--s1);border:1px solid var(--brd2);border-radius:var(--rad);
+  padding:clamp(18px,3vw,24px);max-width:min(92vw,420px);width:100%;position:relative;z-index:1;
+  max-height:84vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;
+  transform:translateY(8px);transition:transform .2s}
+.modal-close{position:absolute;top:12px;right:12px;width:28px;height:28px;
+  border-radius:50%;background:var(--s2);border:1px solid var(--brd);color:var(--t2);
+  font-size:15px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;line-height:1;user-select:none;z-index:2}
+.modal-close:hover{background:var(--r2);color:var(--r)}
+.modal-title{font-size:15px;font-weight:700;letter-spacing:.04em;margin-bottom:16px;color:var(--p);font-family:var(--font-display)}
+.modal-body{font-size:12px;color:var(--t2);line-height:1.78}
+.modal-body h3{font-size:10px;color:var(--txt);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 5px;font-weight:700}
+.modal-body h3:first-child{margin-top:0}
+.modal-body p{margin-bottom:6px}
+.hl-on{color:var(--g);font-weight:600}.hl-off{color:var(--pk);font-weight:600}.hl-p{color:var(--p);font-weight:600}
+#infoToggle:checked ~ .modal-overlay{opacity:1;pointer-events:auto}
+#infoToggle:checked ~ .modal-overlay .modal-box{transform:translateY(0)}
+.lb-backdrop{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 74%,transparent);z-index:1090;
+  opacity:0;pointer-events:none;transition:opacity .3s;cursor:pointer}
+
+@media(max-width:719px){
+  #lbToggle:checked ~ .lb-backdrop{opacity:1;pointer-events:auto}
+  body:has(#lbToggle:checked){overflow:hidden}
+  .lb-col{position:fixed;left:0;right:0;bottom:0;width:100%;max-height:84vh;
+    border-radius:18px 18px 0 0;border-bottom:none;
+    transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,0,1);
+    z-index:1100;box-shadow:0 -12px 44px rgba(0,0,0,.6)}
+  #lbToggle:checked ~ .app .lb-col{transform:translateY(0)}
+  .lb-handle{display:block}
+  .lb-close{display:flex}
+  .lb-tabs{padding-right:46px}
+  .lb-phase .lb-list{max-height:58vh}
+}
+/* (v12) small-phone px overrides removed — the fluid tokens cover ≤380px cleanly */
+/* portrait tablets/2-in-1s at ≥1024px width (iPad Pro 1024×1366, Surface Pro portrait, …)
+   still get the tablet two-column treatment below, not the landscape desktop sidebar grid */
+@media(min-width:1024px) and (min-aspect-ratio:1/1){
+  :root{--bat-w:120px;--recv-w:190px;--wire:clamp(16px,2.2vh,28px)}   /* keep the lamp→battery wire — just short */
+  body{overflow:hidden}
+  .lb-open-btn{display:none}
+  .app{display:grid;height:100vh;height:100dvh;padding-bottom:0;
+    grid-template-columns:1fr clamp(300px,27%,360px);
+    grid-template-rows:auto auto 1fr;grid-template-areas:"hist lb" "hdr lb" "main lb"}
+  .hist-bar{grid-area:hist}
+  .hdr{grid-area:hdr;padding:14px 24px 10px}
+  .logo-wm{font-size:24px}
+  .info-btn{width:34px;height:34px}
+  .bal-val{font-size:18px}
+  .main-content{grid-area:main;overflow-y:auto;height:100%;padding:12px 16px 14px;gap:12px;display:flex;flex-direction:column}
+  .game-zone{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px}
+  .volt-zone{flex:0 0 auto;min-height:74px}
+  .recv-mult{font-size:clamp(34px,4.3vh,52px)}
+  .wire-bridge{flex:0 0 auto}
+  .lamp-card{flex:1 1 auto;min-height:0;justify-content:center;gap:clamp(6px,1.4vh,14px);padding:clamp(10px,1.8vh,22px) 16px}
+  .lamp-outer{flex:0 0 auto;width:clamp(220px,33vh,470px);height:clamp(220px,33vh,470px)}
+  .lamp-info-col{gap:clamp(4px,.9vh,8px)}
+  .lamp-title{font-size:9px}
+  .state-badge{font-size:12px}
+  .pers-box{min-width:140px;padding:4px 12px}
+  .pers-val{font-size:clamp(17px,2.3vh,24px)}
+  .controls{flex:0 0 auto;flex-direction:row;align-items:stretch;gap:14px}
+  .bet-zone{flex:2 1 0;flex-direction:row;gap:14px}
+  .bet-card,.lamp-ctrl{flex:1 1 0}
+  .bet-card{padding:13px 16px}
+  .bet-amount{font-size:24px}
+  .lamp-ctrl{padding:13px 16px}
+  .lamp-ctrl .zone-title{display:block}
+  .lbtn{min-height:0;font-size:23px}
+  .auto-card{flex:1.9 1 0;padding:12px 16px;display:flex;flex-direction:column}
+  .auto-head{margin-bottom:8px}
+  .auto-grid{grid-template-columns:1fr 1fr;gap:7px 10px}
+  .astage{padding:6px 10px}
+  .as-input{padding:5px 9px;font-size:13px}
+  .auto-final{padding:6px 10px;margin-top:7px}
+  .lb-col{grid-area:lb;height:100vh;height:100dvh;border-radius:0;
+    border-top:none;border-right:none;border-bottom:none;border-left:1px solid var(--brd)}
+  .lb-phase .lb-list{max-height:none}
+}
+/* (v12) ≥1500px handled by the --shell-max container cap + fluid --lamp */
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+:root{--bg:#160a2b;--s1:#1d0e3a;--s2:#231047;--s3:#2c1456;--txt:#ffe9f4;--t2:color-mix(in srgb,var(--txt) 50%,transparent);--t3:color-mix(in srgb,var(--txt) 28%,transparent);--p:#ff5f9e;--pk:#ffb347;--g:#33e1ed;--r:#ff4d6d;--b:#8a6dff;--gold:#ffcb47;--p2:color-mix(in srgb,var(--p) 18%,transparent);--p3:color-mix(in srgb,var(--p) 9%,transparent);--pk2:color-mix(in srgb,var(--pk) 15%,transparent);--g2:color-mix(in srgb,var(--g) 16%,transparent);--r2:color-mix(in srgb,var(--r) 16%,transparent);--b2:color-mix(in srgb,var(--b) 16%,transparent);--brd:color-mix(in srgb,#ff5f9e 12%,transparent);--brd2:color-mix(in srgb,#ff5f9e 26%,transparent);--rad:14px;--rad-sm:10px;--font-main:'Jost','Montserrat',sans-serif;--font-display:'Jost','Montserrat',sans-serif;}
+
+/* минимальный концепт-фон: тёмная «плата» + мягкий верхний свет + виньетка.
+   Синтвейв-закат и ретро-сетка убраны — схему несёт .pcb-bg, фон ей не мешает */
+body{background:
+  radial-gradient(52% 40% at 50% 0%,rgba(168,85,247,.15),transparent 70%),
+  radial-gradient(90% 70% at 50% 115%,rgba(255,95,158,.07),transparent 60%),
+  linear-gradient(180deg,#1d0d34 0%,#150a26 55%,#0e0619 100%)}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(125% 92% at 50% 44%,transparent 55%,rgba(2,1,6,.55) 100%)}
+body::after{content:none}
+.recv-mult,.pers-val{text-shadow:0 0 20px var(--glow-p)}
+
+/* (v12) legacy v10 button-calibration + lamp-fit blocks removed.
+   Button sizing now lives in the fluid tokens; the lamp + layout live in the
+   "v12 RESPONSIVE LAYOUT" section further down. These two helpers stay because
+   they prevent flex overflow and are layout-agnostic: */
+.controls,.bet-zone,.bet-card,.lamp-ctrl,.auto-card,.lamp-btns,.qrow,
+.qb,.lbtn,.bet-btn{min-width:0}
+.qb,.lbtn,.bet-btn{white-space:nowrap}
+/* текст и цифры никогда не вылезают за свои зоны — мягкое усечение с «…» */
+.bet-btn,.state-badge,.pers-pay,.bal-val,.tog-lbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pers-box{max-width:100%}
+.lamp-info-col{min-width:0}
+
+/* ===== v10 SIDE FILL — circuit traces + multiplier aura (zero-JS) =========
+   Fills the empty space flanking the lamp with PCB-style traces and a soft
+   aura. Both are tinted by --m-color, set by a multiplier-tier class on .app
+   (m-1x … m-70x). Desktop-only, decorative (pointer-events:none). To reflect a
+   different accumulated multiplier, swap the class (in production: 1 JS line). */
+.app{--m-color:#5b8cff}                 /* default = tier 2x */
+.app.m-1x{--m-color:#2fe0e0}            /* 1x  start  — teal    */
+.app.m-2x{--m-color:#5b8cff}            /* 2x         — azure   */
+.app.m-5x{--m-color:#a06bff}            /* 5x         — violet  */
+.app.m-10x{--m-color:#ff5fb0}           /* 10x        — magenta */
+.app.m-20x{--m-color:#ff9152}           /* 20x        — amber   */
+.app.m-40x{--m-color:#ff5a35}           /* 40x        — orange  */
+.app.m-70x{--m-color:#ff2d4f}           /* 70x last   — red     */
+
+/* landscape-only, like every other desktop-width block below — otherwise a
+   portrait tablet at ≥1024px gets this desktop aura on .lamp-card::after
+   (never neutralised, unlike ::before) despite using the tablet layout */
+@media(min-width:1024px) and (min-aspect-ratio:1/1){
+  .lamp-card{--pcb:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='158' height='158' fill='none' stroke='%23fff' stroke-width='1.5'><path d='M0,38H44V90H102V34H158'/><path d='M28,158V118H80V62H158'/><path d='M158,128H118V158'/><path d='M0,108H22V148'/><path d='M80,0V26'/><g fill='%23fff' stroke='none'><circle cx='44' cy='90' r='3'/><circle cx='102' cy='34' r='3'/><circle cx='80' cy='118' r='3'/><circle cx='80' cy='62' r='3'/><circle cx='22' cy='108' r='3'/><circle cx='118' cy='128' r='3'/><circle cx='80' cy='26' r='3'/></g></svg>")}
+  .lamp-card>.lamp-outer,.lamp-card>.lamp-info-col{position:relative;z-index:2}
+  .lamp-card::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:var(--m-color);opacity:.2;
+    -webkit-mask:var(--pcb) 0 0/158px 158px repeat;mask:var(--pcb) 0 0/158px 158px repeat}
+  .lamp-card::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+    width:auto;height:auto;transform:none;border-radius:0;filter:blur(3px);
+    background:
+      radial-gradient(46% 52% at 50% 46%,color-mix(in srgb,var(--m-color) 26%,transparent),transparent 72%),
+      radial-gradient(85% 66% at 50% 52%,color-mix(in srgb,var(--m-color) 8%,transparent),transparent 80%);
+    animation:pcbAura 3.6s var(--ease) infinite}
+  /* current flows along the traces; aura breathes — both ramp colour with the tier */
+  .lamp-card::before{animation:pcbFlow 7s linear infinite}
+}
+@keyframes pcbFlow{to{-webkit-mask-position:158px 0;mask-position:158px 0}}
+@keyframes pcbAura{0%,100%{opacity:.78}50%{opacity:1}}
+
+/* ===== GAME INTEGRATION — functional states layered onto the design ========= */
+/* the lamp's glow + tier colour now track the live multiplier (set from JS) */
+.lamp-glo{transition:fill .3s var(--ease)}
+.lamp-fil{transition:stroke .3s var(--ease)}
+#lampRing{transition:stroke .3s var(--ease),stroke-dasharray .3s var(--ease)}
+.lamp-ring-anim{transition:opacity .3s var(--ease)}
+
+/* bet amount becomes a real input, styled identically to the design's number */
+input.bet-amount{background:none;border:none;outline:none;color:var(--txt);
+  font-family:var(--font-display);font-weight:800;flex:1 1 auto;width:auto;min-width:0;padding:0;
+  text-overflow:ellipsis;-moz-appearance:textfield;appearance:textfield}
+input.bet-amount::-webkit-outer-spin-button,
+input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.bet-inp-wrap{transition:border-color .15s}
+.bet-inp-wrap:focus-within{border-color:var(--p)}
+
+/* disabled / placed states for the action buttons */
+.lbtn:disabled,.bet-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;filter:saturate(.4)}
+.lbtn:disabled:hover,.bet-btn:disabled:hover{transform:none;filter:saturate(.4)}
+.bet-btn.placed{background:var(--g2);color:var(--g);box-shadow:none;cursor:default}
+.bet-btn.placed:hover{transform:none;filter:none}
+
+/* round status caption + payout hint + seed line — slot into existing cards */
+.status-txt{color:var(--p);font-weight:600}
+.bet-note{font-size:9px;color:var(--t3);margin-top:8px;line-height:1.4;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+/* real autopilot master toggle (replaces the static green chip) */
+.toggle .auto-toggle-input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.toggle .tog-track{background:var(--s3);border-color:var(--brd2);transition:background .18s,border-color .18s}
+.toggle .tog-knob{background:var(--t2);box-shadow:none;left:2px;right:auto;
+  transition:transform .18s var(--ease),background .18s}
+.toggle .tog-lbl{color:var(--t2);transition:color .18s}
+.auto-toggle-input:checked ~ .tog-track{background:var(--g2);border-color:var(--g)}
+.auto-toggle-input:checked ~ .tog-track .tog-knob{transform:translateX(16px);background:var(--g);box-shadow:0 0 6px var(--glow-g)}
+.auto-toggle-input:checked ~ .tog-lbl{color:var(--g)}
+
+/* per-stage + final enable checkboxes (CSS-only dim via :has) */
+.as-num-tog{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none}
+.stage-en{appearance:none;-webkit-appearance:none;width:13px;height:13px;border-radius:4px;
+  border:1.5px solid var(--brd2);background:var(--s3);cursor:pointer;position:relative;
+  transition:all .15s;flex-shrink:0;margin:0}
+.stage-en:checked{background:var(--p);border-color:var(--p)}
+.stage-en:checked::after{content:'';position:absolute;left:3.5px;top:1px;width:3px;height:6px;
+  border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.astage{transition:opacity .15s}
+.astage:has(.stage-en:not(:checked)){opacity:.4}
+.astage:has(.stage-en:not(:checked)) .as-input{pointer-events:none}
+.auto-final{transition:opacity .15s}
+.auto-final:has(.stage-en:not(:checked)){opacity:.4}
+.auto-status{font-size:9px;color:var(--t3);line-height:1.55;margin-top:8px;
+  background:var(--s2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:7px 10px}
+.auto-status b{color:var(--p);font-weight:700}
+.auto-status .on{color:var(--g)}.auto-status .off{color:var(--pk)}
+
+/* crash shake on the voltage zone + screen flash */
+@keyframes voltShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}60%{transform:translateX(2px)}}
+.volt-zone.crash-shake{animation:voltShake .35s ease-out}
+@keyframes flMv{from{opacity:.55}to{opacity:0}}
+.flash{position:fixed;inset:0;pointer-events:none;z-index:1200;animation:flMv .6s ease-out forwards}
+.recv-mult.is-crash{text-shadow:0 0 26px currentColor}  /* glow matches the tier colour (set inline) */
+
+/* ===== ACCUMULATOR — empty at start, charges + shimmers with the multiplier = */
+.bat-body{color:var(--m-color);transition:color .4s var(--ease)}
+.bat-seg{fill:currentColor;opacity:.08;transition:opacity .4s var(--ease);will-change:filter}
+.bat-seg.on{opacity:.9;animation:batShimmer var(--bat-speed,1.7s) var(--ease) infinite}
+.bat-seg.on:nth-of-type(2){animation-delay:.08s}
+.bat-seg.on:nth-of-type(3){animation-delay:.16s}
+.bat-seg.on:nth-of-type(4){animation-delay:.24s}
+.bat-seg.on:nth-of-type(5){animation-delay:.32s}
+@keyframes batShimmer{0%,100%{opacity:.45}50%{opacity:1;filter:drop-shadow(0 0 2.5px currentColor)}}
+.bat-connector{background:linear-gradient(180deg,var(--m-color),var(--pk));transition:background .4s var(--ease)}
+
+/* ===== START TIMER — sits under the lamp, counts down to the next round ===== */
+.start-timer{width:100%;margin-top:2px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:9px 14px}
+.st-head{display:flex;align-items:baseline;gap:9px}
+.st-lbl{font-size:9px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.st-sec{font-size:24px;font-weight:800;font-family:var(--font-display);font-variant-numeric:tabular-nums;
+  line-height:1;color:var(--b);min-width:24px;text-align:center;transition:color .3s}
+.st-bar{width:100%;height:4px;border-radius:3px;background:var(--s3);overflow:hidden}
+.st-fill{height:100%;width:100%;border-radius:3px;background:linear-gradient(90deg,var(--b),var(--m-color));
+  transition:width .12s linear}
+.start-timer[data-state="live"] .st-sec{color:var(--m-color);letter-spacing:.1em}
+.start-timer[data-state="live"] .st-fill{background:var(--m-color);opacity:.5}
+.start-timer[data-state="crash"] .st-sec{color:var(--r)}
+.start-timer[data-state="crash"] .st-fill{background:var(--r)}
+
+/* ===== CIRCUIT-NODE BACKGROUND — full-bleed PCB, current flows + vias pulse == */
+.pcb-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;color:var(--m-color);
+  opacity:.34;transition:color .5s var(--ease);contain:strict}
+.pcb-bg svg{width:100%;height:100%;display:block}
+.pcb-trace{fill:none;stroke:currentColor;stroke-width:1.3;opacity:.16}
+.pcb-current{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;
+  stroke-dasharray:16 260;filter:drop-shadow(0 0 4px currentColor);opacity:.85;
+  animation:pcbDash 4.5s linear infinite}
+.pcb-current.c2{animation-duration:6s;animation-delay:-1.5s}
+.pcb-current.c3{animation-duration:5.2s;animation-delay:-3s}
+.pcb-current.c4{animation-duration:7s;animation-delay:-2s}
+.pcb-current.c5{animation-duration:4s;animation-delay:-1s}
+@keyframes pcbDash{to{stroke-dashoffset:-276}}
+.pcb-node{fill:currentColor;opacity:.45;animation:pcbNode 2.8s var(--ease) infinite}
+.pcb-node:nth-of-type(2n){animation-delay:.7s}
+.pcb-node:nth-of-type(3n){animation-delay:1.4s}
+.pcb-node:nth-of-type(4n){animation-delay:2.1s}
+@keyframes pcbNode{0%,100%{opacity:.22}50%{opacity:.85}}
+.pcb-pad{fill:none;stroke:currentColor;stroke-width:1.2;opacity:.3}
+@media(prefers-reduced-motion:reduce){
+  .pcb-current,.pcb-node,.bat-seg.on,.bolt.on,.volt-zone.live .tip-spark,
+  .lamp-svg.broken,.lamp-card.crashed .lamp-smoke{animation:none}
+  .lamp-svg.broken .shard{animation:none;opacity:0}
+  .lamp-fil,.bat-seg{will-change:auto}   /* drop the compositing hint once nothing is actually animating */
+  .pcb-current{opacity:.4}
+}
+
+/* ===== LAMP-ZONE CIRCUIT — masked PCB tile fills the zone; tinted by the tier colour, scrolls (current flows) ==== */
+.lamp-card>.lamp-outer,.lamp-card>.lamp-info-col{position:relative;z-index:2}
+.lamp-card::before{content:none!important}     /* superseded by .lamp-pcb below */
+.lamp-pcb{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;border-radius:var(--rad);
+  --lp-traces:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='340' height='340' fill='none' stroke='%23fff' stroke-width='1.5' stroke-opacity='.6'><path d='M0,118H60V44H142'/><path d='M142,90V158H340'/><path d='M300,96V200H196V312'/><path d='M30,196H116V312'/><path d='M222,128V220H340'/><path d='M262,32V90H340'/><path d='M44,312H162V278H240'/><path d='M0,220H116'/></svg>");
+  --lp-nodes:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='340' height='340' fill='%23fff'><circle cx='28' cy='44' r='7' fill-opacity='.18'/><circle cx='108' cy='24' r='7' fill-opacity='.18'/><circle cx='188' cy='56' r='7' fill-opacity='.18'/><circle cx='262' cy='32' r='7' fill-opacity='.18'/><circle cx='316' cy='96' r='7' fill-opacity='.18'/><circle cx='60' cy='118' r='7' fill-opacity='.18'/><circle cx='142' cy='90' r='7' fill-opacity='.18'/><circle cx='222' cy='128' r='7' fill-opacity='.18'/><circle cx='300' cy='160' r='7' fill-opacity='.18'/><circle cx='170' cy='158' r='7' fill-opacity='.18'/><circle cx='30' cy='196' r='7' fill-opacity='.18'/><circle cx='116' cy='222' r='7' fill-opacity='.18'/><circle cx='196' cy='186' r='7' fill-opacity='.18'/><circle cx='274' cy='220' r='7' fill-opacity='.18'/><circle cx='322' cy='286' r='7' fill-opacity='.18'/><circle cx='78' cy='286' r='7' fill-opacity='.18'/><circle cx='162' cy='312' r='7' fill-opacity='.18'/><circle cx='240' cy='278' r='7' fill-opacity='.18'/><circle cx='44' cy='312' r='7' fill-opacity='.18'/><circle cx='316' cy='200' r='7' fill-opacity='.18'/><circle cx='28' cy='44' r='2.6'/><circle cx='108' cy='24' r='2.6'/><circle cx='188' cy='56' r='2.6'/><circle cx='262' cy='32' r='2.6'/><circle cx='316' cy='96' r='2.6'/><circle cx='60' cy='118' r='2.6'/><circle cx='142' cy='90' r='2.6'/><circle cx='222' cy='128' r='2.6'/><circle cx='300' cy='160' r='2.6'/><circle cx='170' cy='158' r='2.6'/><circle cx='30' cy='196' r='2.6'/><circle cx='116' cy='222' r='2.6'/><circle cx='196' cy='186' r='2.6'/><circle cx='274' cy='220' r='2.6'/><circle cx='322' cy='286' r='2.6'/><circle cx='78' cy='286' r='2.6'/><circle cx='162' cy='312' r='2.6'/><circle cx='240' cy='278' r='2.6'/><circle cx='44' cy='312' r='2.6'/><circle cx='316' cy='200' r='2.6'/></svg>")}
+/* both layers stay put (no board-sliding); a bright band of voltage sweeps THROUGH
+   them, and the nodes flicker — natural circuit behaviour. base tint = tier colour. */
+.lamp-pcb::before,.lamp-pcb::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-color:var(--m-color);background-repeat:no-repeat;transition:background-color .5s var(--ease);
+  -webkit-mask-repeat:repeat;mask-repeat:repeat;-webkit-mask-size:340px 340px;mask-size:340px 340px}
+/* layer 1: traces — steady, with a current pulse running along them */
+.lamp-pcb::before{opacity:.4;
+  -webkit-mask-image:var(--lp-traces);mask-image:var(--lp-traces);
+  background-image:linear-gradient(115deg,transparent 38%,color-mix(in srgb,#fff 55%,transparent) 50%,transparent 62%);
+  background-size:55% 100%;background-position:-60% 0;
+  animation:lpFlow 3.4s linear infinite}
+/* layer 2: vias/nodes — a wave of light lights them up in turn, plus a neon flicker */
+.lamp-pcb::after{opacity:.62;
+  -webkit-mask-image:var(--lp-nodes);mask-image:var(--lp-nodes);
+  background-image:linear-gradient(115deg,transparent 40%,color-mix(in srgb,#fff 78%,transparent) 50%,transparent 60%);
+  background-size:48% 100%;background-position:160% 0;
+  animation:lpWave 4.6s linear infinite, lpFlicker 3.4s steps(1,end) infinite}
+@keyframes lpFlow{to{background-position:160% 0}}
+@keyframes lpWave{to{background-position:-60% 0}}
+@keyframes lpFlicker{0%,42%,45%,78%,81%,100%{opacity:.62}43%{opacity:.95}79%{opacity:.8}}
+
+/* ═══ ГЛУБИНА PCB-ЗОНЫ: дальний размытый слой платы + внутренняя виньетка ═══ */
+.lamp-pcb-far{filter:blur(1.1px);opacity:.4}
+.lamp-pcb-far::before,.lamp-pcb-far::after{-webkit-mask-size:216px 216px;mask-size:216px 216px}
+.lamp-pcb-far::before{opacity:.26;animation-duration:5.2s}
+.lamp-pcb-far::after{opacity:.4;animation-duration:6.8s,5.2s}
+.lamp-vig{position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:var(--rad);
+  background:radial-gradient(92% 82% at 50% 46%,transparent 46%,rgba(4,2,10,.62) 100%)}
+
+/* когда лампа горит — схемные узлы НЕ гасятся и не блюрятся: лампа просто
+   светит ЯРЧЕ узлов (три слоя свечения вокруг колбы) и выделяется сама */
+.lamp-card.lamp-lit .lamp-svg{filter:
+  drop-shadow(0 0 10px color-mix(in srgb,var(--m-color) 85%,transparent))
+  drop-shadow(0 0 26px color-mix(in srgb,var(--m-color) 55%,transparent))
+  drop-shadow(0 0 54px color-mix(in srgb,var(--m-color) 32%,transparent))}
+.lamp-svg{transition:filter .35s var(--ease)}
+
+/* ═══ ЛАМПА: состояния стекла и спирали — классы на .lamp-svg ═══ */
+#lampInner{opacity:0;transition:opacity .35s var(--ease)}
+#lampGlow{rx:0;ry:0}
+#lampFil{transition:stroke .3s var(--ease)}
+#lampFilBroken,#bulbBroken{display:none}
+.lamp-svg.is-on #lampInner{opacity:.92}
+.lamp-svg.is-on #lampFil{stroke:var(--m-color);color:var(--m-color)}
+.lamp-svg.is-on #lampGlow{rx:30px;ry:32px;fill:color-mix(in srgb,var(--m-color) 65%,transparent)}
+.lamp-svg.is-on #lampBulb{stroke:color-mix(in srgb,var(--m-color) 50%,var(--lamp-line))}
+.lamp-svg.is-off #lampFil{stroke:var(--lamp-line);animation:none;filter:none}
+.lamp-svg.is-off #lampGlow{fill:transparent}
+
+/* ═══ СЛОМ ПРИ КРАШЕ: толчок → верх колбы отлетает осколками,
+       остаётся рваный край (по референсам разбитой лампы) ═══ */
+.lamp-svg.broken #lampFil,
+.lamp-svg.broken .bulb-gloss,
+.lamp-svg.broken #lampBulb{display:none}
+.lamp-svg.broken #lampFilBroken{display:block}
+.lamp-svg.broken #bulbBroken{display:block}
+.lamp-svg.broken #lampInner{opacity:.15;fill:var(--r)}
+.lamp-svg.broken #lampGlow{rx:22px;ry:24px;fill:color-mix(in srgb,var(--r) 38%,transparent)}
+#bulbBroken path{stroke:color-mix(in srgb,var(--r) 40%,var(--lamp-line))}
+#bulbBroken .rim{stroke:rgba(255,255,255,.4);stroke-width:.8;fill:none}
+.lamp-svg.broken{animation:bulbJolt .38s ease-out}
+@keyframes bulbJolt{0%{transform:none}22%{transform:translate(-1.5px,.5px) rotate(-1.6deg)}
+  55%{transform:translate(1px,0) rotate(1deg)}100%{transform:none}}
+.shard{fill:rgba(255,255,255,.12);stroke:rgba(255,255,255,.42);stroke-width:.5;
+  opacity:0;transform-box:fill-box;transform-origin:center}
+.lamp-svg.broken .shard{animation:shardFly .8s cubic-bezier(.2,.55,.6,1) .05s forwards}
+.lamp-svg.broken .s2{animation-delay:.08s;animation-duration:.72s}
+.lamp-svg.broken .s3{animation-delay:.11s;animation-duration:.88s}
+.lamp-svg.broken .s4{animation-delay:.06s;animation-duration:.95s}
+.lamp-svg.broken .s5{animation-delay:.13s;animation-duration:.78s}
+.lamp-svg.broken .s6{animation-delay:.16s;animation-duration:.85s}
+@keyframes shardFly{0%{opacity:1;transform:translate(0,0) rotate(0)}
+  70%{opacity:.9}
+  100%{opacity:0;transform:translate(var(--sx,10px),var(--sy,-16px)) rotate(var(--sr,140deg))}}
+.shard.s1{--sx:-16px;--sy:-14px;--sr:-150deg}
+.shard.s2{--sx:2px;--sy:-21px;--sr:120deg}
+.shard.s3{--sx:17px;--sy:-13px;--sr:160deg}
+.shard.s4{--sx:-21px;--sy:-4px;--sr:-120deg}
+.shard.s5{--sx:21px;--sy:-6px;--sr:130deg}
+.shard.s6{--sx:9px;--sy:-19px;--sr:100deg}
+.lamp-smoke{position:absolute;left:50%;top:7%;width:3px;height:26%;pointer-events:none;z-index:3;
+  opacity:0;transform:translateX(-50%)}
+.lamp-smoke::before,.lamp-smoke::after{content:'';position:absolute;left:0;border-radius:50%;
+  background:rgba(210,200,225,.15);filter:blur(4px)}
+.lamp-smoke::before{width:8px;height:8px;bottom:0}
+.lamp-smoke::after{width:13px;height:13px;bottom:44%;left:-4px;background:rgba(210,200,225,.09)}
+.lamp-card.crashed .lamp-smoke{animation:smokeUp 2.4s ease-out .25s forwards}
+@keyframes smokeUp{0%{opacity:0;transform:translateX(-50%) translateY(24%)}
+  18%{opacity:1}100%{opacity:0;transform:translateX(-53%) translateY(-70%)}}
+
+/* moving current dots travelling the traces through the vias (chaotic timings).
+   They speed up (--lf-k divisor grows) and multiply (denser dash) with the tier. */
+.lamp-flow{position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%;
+  color:var(--m-color);transition:color .5s var(--ease);--lf-k:1}
+.app.m-2x  .lamp-flow{--lf-k:1.35}
+.app.m-5x  .lamp-flow{--lf-k:1.75}
+.app.m-10x .lamp-flow{--lf-k:2.2}
+.app.m-20x .lamp-flow{--lf-k:2.8}
+.app.m-40x .lamp-flow{--lf-k:3.4}
+.app.m-70x .lamp-flow{--lf-k:4.2}
+.lf-line{fill:none;stroke:currentColor;stroke-width:1.3;opacity:.18;vector-effect:non-scaling-stroke}
+.lf-node{fill:currentColor;opacity:.5;filter:drop-shadow(0 0 3px currentColor)}
+.lf-dot{fill:none;stroke:currentColor;stroke-width:3.4;stroke-linecap:round;
+  stroke-dasharray:1.5 48.5;opacity:.95;vector-effect:non-scaling-stroke;   /* 2 runners per line (period 50 divides 100 → seamless) */
+  filter:drop-shadow(0 0 3px currentColor);
+  animation-name:lfRun;animation-timing-function:linear;animation-iteration-count:infinite;
+  animation-duration:calc(var(--b,3.2s)/var(--lf-k,1))}
+/* each new tier colour reveals a NEW route group → new runners on new lines */
+.lf-g{display:none}
+.lf-g1{display:block}                              /* m-1x — base routes */
+.app.m-2x  .lf-g2,.app.m-5x .lf-g2,.app.m-10x .lf-g2,.app.m-20x .lf-g2,.app.m-40x .lf-g2,.app.m-70x .lf-g2{display:block}
+.app.m-5x  .lf-g3,.app.m-10x .lf-g3,.app.m-20x .lf-g3,.app.m-40x .lf-g3,.app.m-70x .lf-g3{display:block}
+.app.m-10x .lf-g4,.app.m-20x .lf-g4,.app.m-40x .lf-g4,.app.m-70x .lf-g4{display:block}
+.app.m-20x .lf-g5,.app.m-40x .lf-g5,.app.m-70x .lf-g5{display:block}
+.app.m-40x .lf-g6,.app.m-70x .lf-g6{display:block}
+.app.m-70x .lf-g7{display:block}
+.lf-dot.d1{--b:3.2s}
+.lf-dot.d2{--b:4.6s;animation-delay:-2.1s}
+.lf-dot.d3{--b:2.5s;animation-delay:-1.2s}
+.lf-dot.d4{--b:3.9s;animation-delay:-0.6s}
+.lf-dot.d5{--b:5.3s;animation-delay:-3.1s}
+.lf-dot.d6{--b:2.9s;animation-delay:-1.7s}
+.lf-dot.d7{--b:4.2s;animation-delay:-0.3s}
+.lf-dot.d8{--b:3.5s;animation-delay:-2.6s}
+.lf-dot.d9{--b:4.9s;animation-delay:-1.0s}
+.lf-dot.d10{--b:2.7s;animation-delay:-2.3s}
+.lf-dot.d11{--b:3.6s;animation-delay:-0.9s}
+.lf-dot.d12{--b:4.4s;animation-delay:-3.4s}
+.lf-dot.d13{--b:3.8s;animation-delay:-1.5s}
+.lf-dot.d14{--b:5.1s;animation-delay:-0.4s}
+.lf-dot.d15{--b:2.8s;animation-delay:-2.9s}
+.lf-dot.d16{--b:4.3s;animation-delay:-1.1s}
+.lf-dot.d17{--b:3.1s;animation-delay:-2.2s}
+.lf-dot.d18{--b:4.7s;animation-delay:-0.7s}
+.lf-dot.d19{--b:2.6s;animation-delay:-1.9s}
+.lf-dot.d20{--b:5.0s;animation-delay:-3.0s}
+.lf-dot.d21{--b:3.4s;animation-delay:-0.5s}
+.lf-dot.d22{--b:4.0s;animation-delay:-2.5s}
+.lf-dot.d23{--b:2.9s;animation-delay:-1.4s}
+.lf-dot.d24{--b:4.5s;animation-delay:-3.2s}
+/* half the runners travel the opposite way → chaotic mix of directions */
+.lf-dot.d2,.lf-dot.d4,.lf-dot.d6,.lf-dot.d8,.lf-dot.d10,.lf-dot.d12,
+.lf-dot.d14,.lf-dot.d16,.lf-dot.d18,.lf-dot.d20,.lf-dot.d22,.lf-dot.d24{animation-direction:reverse}
+@keyframes lfRun{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+
+/* before the tier colour changes, the vias flash briefly */
+.lamp-card.lp-flash .lf-node{animation:lpFlashNode .42s var(--ease)}
+.lamp-card.lp-flash .lamp-pcb::after{animation:lpWave 4.6s linear infinite, lpFlashLayer .42s var(--ease)}
+@keyframes lpFlashNode{0%{opacity:.5}28%{opacity:1;filter:drop-shadow(0 0 8px currentColor) brightness(1.7)}100%{opacity:.5}}
+@keyframes lpFlashLayer{0%,100%{opacity:.62}30%{opacity:1}}
+
+@media(prefers-reduced-motion:reduce){
+  .lamp-pcb::before,.lamp-pcb::after,.lf-dot,.lamp-card.lp-flash .lf-node{animation:none}}
+
+/* ===== LAMP WIRE — dim when the lamp is OFF, bright (tier colour) when ON ==== */
+.wire-bridge{--wire-c:var(--p);transition:opacity .3s var(--ease)}
+.wire-bridge i{background:linear-gradient(var(--wire-c),var(--wire-c))}
+.wire-node{background:var(--wire-c)}
+@keyframes wirePulse{
+  from{box-shadow:0 0 5px color-mix(in srgb,var(--wire-c) 65%,transparent);opacity:.82}
+  to{box-shadow:0 0 14px var(--wire-c);opacity:1}}
+.wire-bridge.w-off{--wire-c:color-mix(in srgb,var(--p) 42%,var(--t3));opacity:.32}
+.wire-bridge.w-off i,.wire-bridge.w-off .wire-node{animation-play-state:paused;
+  box-shadow:0 0 2px color-mix(in srgb,var(--wire-c) 40%,transparent)}
+.wire-bridge.w-on{--wire-c:var(--m-color);opacity:1}
+.wire-bridge.w-on i{box-shadow:0 0 10px var(--m-color)}
+.wire-bridge.w-on .wire-node{box-shadow:0 0 15px var(--m-color)}
+.wire-bridge.w-crash{--wire-c:var(--r);opacity:1}
+@media(prefers-reduced-motion:reduce){.lamp-pcb{animation:none}}
+
+/* ===== VOLTAGE SCALE — current flows only while a round is live ============= */
+.volt-zone .bolt{transition:opacity .15s var(--ease)}
+.volt-zone:not(.live) .bolt{opacity:0!important;animation-play-state:paused}
+.volt-zone:not(.live) .arc-base{opacity:.5}
+
+/* ===== ON / OFF — only the currently-available action lights up ============= */
+.lbtn{transition:opacity .2s var(--ease),filter .2s var(--ease),box-shadow .2s var(--ease)}
+.lbtn:disabled{opacity:.16;filter:grayscale(.65)}          /* unavailable → dark */
+.lbtn-on:not(:disabled){animation:lbtnGlowOn 1.7s var(--ease) infinite}
+.lbtn-off:not(:disabled){animation:lbtnGlowOff 1.7s var(--ease) infinite}
+@keyframes lbtnGlowOn{0%,100%{box-shadow:0 4px 24px var(--glow-g)}50%{box-shadow:0 7px 38px var(--glow-g)}}
+@keyframes lbtnGlowOff{0%,100%{box-shadow:0 4px 24px var(--glow-p)}50%{box-shadow:0 7px 38px var(--glow-p)}}
+@media(prefers-reduced-motion:reduce){.lbtn-on:not(:disabled),.lbtn-off:not(:disabled){animation:none}}
+
+/* ===== LEADERBOARD — single auto-switching view (До старта → В игре) ======== */
+.lb-title{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--brd);
+  flex-shrink:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--b);transition:color .3s var(--ease)}
+.lb-title-dot{width:7px;height:7px;border-radius:50%;background:var(--b);box-shadow:0 0 8px var(--b);
+  flex-shrink:0;transition:background .3s var(--ease),box-shadow .3s var(--ease)}
+.lb-title.lb-live{color:var(--g)}
+.lb-title.lb-live .lb-title-dot{background:var(--g);box-shadow:0 0 9px var(--glow-g);animation:lbDotPulse 1.6s var(--ease) infinite}
+@keyframes lbDotPulse{0%,100%{box-shadow:0 0 7px var(--glow-g)}50%{box-shadow:0 0 13px var(--glow-g)}}
+
+/* ON/OFF ratio percentage, beside the bar */
+.onoff-pct{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--g);
+  flex-shrink:0;min-width:40px;text-align:right;letter-spacing:.02em}
+
+/* total table winnings, revealed when the round ends */
+.lb-round-win{margin-top:8px;font-size:11px;font-weight:700;text-align:center;
+  background:var(--g2);border:1px solid var(--on-brd);border-radius:var(--rad-sm);
+  padding:7px 10px;color:var(--g);font-variant-numeric:tabular-nums}
+.lb-round-win[hidden]{display:none}
+.lb-round-win b{color:var(--gold);font-weight:800}
+@media(max-width:719px){.lb-title{padding-right:46px}}
+@media(prefers-reduced-motion:reduce){.lb-title.lb-live .lb-title-dot{animation:none}}
+
+/* ===== TOUCH CALIBRATION — proportional tap targets + no iOS focus-zoom ======
+   Header icon buttons scale with the viewport (floor = touch-safe); the quick-bet
+   and ON/OFF sizing lives in the fluid clamps above (touch-safe floors baked in). */
+@media(max-width:1023px),(min-width:1024px) and (max-aspect-ratio:999/1000){
+  .info-btn{width:clamp(40px,10vw,44px);height:clamp(40px,10vw,44px)}
+  .info-btn svg{width:44%;height:44%}
+}
+@media(max-width:1023px),(min-width:1024px) and (max-aspect-ratio:999/1000){
+  .as-input{font-size:16px}                              /* ≥16px → no iOS auto-zoom on focus */
+  .astage{grid-template-columns:34px 1fr 1fr}            /* room for a bigger toggle hit area */
+  .as-num-tog{min-width:34px;min-height:44px;justify-content:center;padding:3px}
+  .toggle{padding:6px 4px}                               /* enlarge switch tap area */
+}
+/* (v12) 580px tablet-centering removed — the two-column mode owns 768–1023px */
+
+/* ===== WIN POPUP — appears after a winning round ============================ */
+.win-pop{position:fixed;left:0;right:0;top:0;z-index:1300;display:flex;justify-content:center;
+  padding-top:max(16px,4vh);pointer-events:none}
+.win-pop[hidden]{display:none}
+.win-pop-card{pointer-events:auto;cursor:pointer;width:min(340px,88vw);min-width:0;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,var(--s1),var(--s2));border:1.5px solid var(--on-brd);border-radius:18px;
+  padding:15px 28px 13px;text-align:center;
+  box-shadow:0 18px 60px rgba(0,0,0,.55),0 0 42px var(--glow-g);
+  transform:translateY(-30px) scale(.92);opacity:0;
+  transition:transform .36s var(--ease),opacity .36s var(--ease)}
+.win-pop.show .win-pop-card{transform:translateY(0) scale(1);opacity:1}
+.win-pop-card::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 92% at 50% -8%,color-mix(in srgb,var(--g) 22%,transparent),transparent 62%)}
+.win-pop-card>*{position:relative}
+.win-pop-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--g);font-weight:700}
+.win-pop-amt{font-family:var(--font-display);font-weight:800;font-size:clamp(28px,7vw,36px);line-height:1.1;
+  color:var(--g);margin-top:3px;font-variant-numeric:tabular-nums;text-shadow:0 0 26px var(--glow-g)}
+.win-pop-sub{font-size:11px;color:var(--t2);margin-top:5px;font-variant-numeric:tabular-nums}
+.win-pop-sub b{color:var(--gold);font-weight:700}
+.win-pop-hint{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-top:8px}
+@media(prefers-reduced-motion:reduce){.win-pop-card{transition:opacity .2s}}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v12 — RESPONSIVE LAYOUT  ·  one system: column → two-column → grid + sidebar
+   • the game field (lamp) is always the hero
+   • fit-to-viewport, never a horizontal scroll, container capped on ultrawide
+   • autopilot + leaderboard become slide-up sheets below the desktop breakpoint
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ON/OFF is the in-play control — keep it ABOVE the bet card in every layout so the
+   player watches the multiplier and toggles the lamp without scrolling the screen */
+.bet-zone .lamp-ctrl{order:-1}
+
+/* NO back glow behind the lamp on ANY device — remove the ::after aura/blob
+   everywhere (the circuit traces + nodes stay; only the diffuse glow is gone) */
+.lamp-card::after{content:none!important}
+
+/* ── AUTOPILOT SHEET — шторка ТОЛЬКО на телефонах (портрет) и коротких
+      ландшафтных экранах; в двухколоночном режиме (планшеты, портретные
+      2-в-1) панель автопилота стоит ИНЛАЙН в правой рейке под ставкой ── */
+.auto-open-btn,.sheet-handle,.sheet-close{display:none}
+@media(max-width:767px),(max-width:1023px) and (max-height:560px) and (min-aspect-ratio:13/10){
+  .auto-open-btn{display:flex}
+  .sheet-handle{display:block}
+  .sheet-close{display:flex}
+  .auto-card{position:fixed;left:0;right:0;bottom:0;z-index:1100;width:100%;
+    max-width:var(--shell-max);margin-inline:auto;max-height:82vh;overflow-y:auto;
+    border-radius:18px 18px 0 0;border-bottom:none;
+    transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 -12px 44px rgba(0,0,0,.6);
+    padding:10px clamp(12px,4vw,18px) calc(16px + env(safe-area-inset-bottom,0px))}
+  .auto-card .auto-head{padding-right:34px}
+  #autoToggle:checked ~ .app .auto-card{transform:translateY(0)}
+  .auto-backdrop{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 74%,transparent);
+    z-index:1090;opacity:0;pointer-events:none;transition:opacity .3s;cursor:pointer}
+  #autoToggle:checked ~ .auto-backdrop{opacity:1;pointer-events:auto}
+  body:has(#autoToggle:checked){overflow:hidden}
+  .sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--brd2);margin:2px auto 8px}
+  .sheet-close{position:absolute;top:10px;right:12px;width:30px;height:30px;border-radius:50%;
+    background:var(--s2);border:1px solid var(--brd);color:var(--t2);font-size:16px;cursor:pointer;
+    font-family:inherit;display:flex;align-items:center;justify-content:center;line-height:1;z-index:3}
+  .sheet-close:hover{background:var(--r2);color:var(--r)}
+}
+
+/* ── LEADERBOARD SHEET — the base file only did this ≤719px; extend to all
+      sub-desktop widths (and portrait tablets ≥1024px) so it never sits in the
+      flow and eats the shell height ── */
+@media(min-width:720px) and (max-width:1023px),(min-width:1024px) and (max-aspect-ratio:999/1000){
+  #lbToggle:checked ~ .lb-backdrop{opacity:1;pointer-events:auto}
+  body:has(#lbToggle:checked){overflow:hidden}
+  .lb-col{position:fixed;left:0;right:0;bottom:0;width:100%;max-height:84vh;
+    border-radius:18px 18px 0 0;border:1px solid var(--brd);border-bottom:none;
+    transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,0,1);
+    z-index:1100;box-shadow:0 -12px 44px rgba(0,0,0,.6)}
+  #lbToggle:checked ~ .app .lb-col{transform:translateY(0)}
+  .lb-handle{display:block}.lb-close{display:flex}
+  .lb-tabs{padding-right:46px}.lb-phase .lb-list{max-height:58vh}
+}
+
+/* ── COMPACT — phones (portrait ≤767px): fit-to-viewport column, lamp centred in
+      the flexible middle, bet + ON/OFF always visible at the bottom ── */
+@media(max-width:767px){
+  .app{height:100dvh;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+  /* tighter gaps between blocks → more room for the lamp and buttons */
+  .main-content{flex:1;min-height:0;overflow:hidden;gap:clamp(6px,1.1vh,12px);padding-inline:var(--gutter)}
+  .game-zone{flex:1;min-height:0;gap:clamp(4px,.9vh,9px)}
+  .volt-zone,.wire-bridge,.start-timer{flex:0 0 auto}
+  /* lamp + personal-× fill the lamp card and never spill onto the controls:
+     the lamp takes the flexible row (shrinks on short screens, capped by --lamp),
+     the info column sits in the auto row below it */
+  .lamp-card{flex:1;min-height:0;display:grid;grid-template-rows:minmax(110px,1fr) auto;
+    justify-items:center;align-content:stretch;padding:8px 12px;gap:clamp(3px,.8vh,7px)}
+  .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:var(--lamp)}
+  .lamp-info-col{gap:clamp(3px,.8vh,6px)}
+  .controls{flex:0 0 auto;gap:clamp(6px,1vh,10px)}
+  .bet-zone{gap:clamp(6px,1vh,10px)}
+  .lamp-ctrl .lamp-btns{grid-template-columns:1fr 1fr}
+}
+/* mobile density — with ON/OFF + bet stacked, the control panel is tall; trim its
+   internal padding/margins (and the timer + personal-× box) so the lamp keeps as
+   much of the screen as possible. ON/OFF itself stays full-size (it's the priority) */
+@media(max-width:767px){
+  .bet-card{padding:8px 12px 9px}
+  .bet-card .zone-title{margin-bottom:4px}
+  .bet-inp-wrap{padding:6px 12px;margin-bottom:6px}
+  .qrow{margin-bottom:6px}
+  .bet-note{display:none}
+  .lamp-ctrl{padding:7px}
+  .pers-box{padding:3px 10px}
+  .pers-val{font-size:clamp(16px,3.8vw,21px)}
+  .start-timer{padding:6px 14px;gap:3px}
+  .hist-bar{padding:6px 12px}
+  .wire-bridge{--wire:clamp(18px,2.4vh,28px)}
+}
+/* short phones (e.g. 320×568, 360×640): let the play column scroll rather than
+   ever clip — header stays put, nothing is cut off, still no horizontal scroll */
+@media(max-width:767px) and (max-height:700px){
+  .main-content{overflow-y:auto;-webkit-overflow-scrolling:touch}
+}
+
+/* ── TWO-COLUMN — tablets (≥768) and any landscape below desktop: lamp left,
+      controls right, fit-to-viewport. Also covers portrait tablets/2-in-1s at
+      ≥1024px width (iPad Pro / Surface Pro portrait) — width alone can't tell
+      those apart from a landscape desktop, so aspect-ratio decides. ── */
+@media (min-width:768px) and (max-width:1023px),
+       (max-width:1023px) and (min-aspect-ratio:13/10),
+       (min-width:1024px) and (max-aspect-ratio:999/1000){
+  .app{height:100dvh;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .main-content{flex:1;min-height:0;overflow:hidden;flex-direction:row;align-items:stretch;
+    gap:clamp(12px,2.4vw,22px);
+    padding:var(--gap) max(var(--gutter),env(safe-area-inset-right,0px))
+            var(--gap) max(var(--gutter),env(safe-area-inset-left,0px))}
+  .game-zone{flex:1.15 1 0;min-width:0;min-height:0;justify-content:center;gap:var(--gap)}
+  .volt-zone,.wire-bridge,.start-timer{flex:0 0 auto}
+  .lamp-card{flex:1 1 auto;min-height:0;justify-content:center}
+  .lamp-outer{width:min(48vw,60vh,500px);height:min(48vw,60vh,500px);max-width:100%}
+  .controls{flex:1 1 0;min-width:0;min-height:0;overflow-y:auto;justify-content:flex-start}
+  .bet-zone{flex-direction:column}
+  .lamp-ctrl .lamp-btns{grid-template-columns:1fr 1fr}
+  .lbtn{min-height:clamp(56px,10vh,96px)}
+  /* автопилот инлайн в рейке — компактный масштаб, заполняет пустоту под ставкой */
+  .auto-card{padding:9px 12px}
+  .auto-head{margin-bottom:7px}
+  .auto-grid{gap:5px}
+  .astage{padding:5px 8px;grid-template-columns:26px 1fr 1fr}
+  .as-num-tog{min-width:26px;min-height:36px}
+  .auto-final{padding:5px 8px;margin-top:5px}
+  .auto-status{margin-top:6px;padding:6px 9px}
+}
+/* планшеты и ландшафтные телефоны (640–1023) с малой высотой: инфо-колонка
+   вбок от лампы, зона узлов — на всю ширину; размер лампы задан от высоты
+   вьюпорта (в скролл-контексте компактной ветки height:100% схлопывается) */
+@media (min-width:640px) and (max-width:1023px) and (min-aspect-ratio:13/10) and (max-height:680px){
+  .lamp-card{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto;
+    align-items:center;justify-items:center;column-gap:clamp(8px,1.8vw,18px);padding:8px 14px}
+  .lamp-outer{grid-column:1;grid-row:1;width:auto;height:clamp(120px,54vh,340px);
+    aspect-ratio:1;max-width:100%}
+  .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;gap:clamp(5px,1.2vh,10px)}
+}
+/* short landscape phones — compact (not remove) the history/wire/timer chrome
+   so every element stays reachable, and float ON/OFF to the top of the rail
+   so the in-play control is always visible */
+@media (max-width:1023px) and (max-height:520px) and (min-aspect-ratio:13/10){
+  .volt-zone{min-height:40px}
+  .hist-bar{padding:3px 10px;gap:5px}
+  .hist-bar .hc{padding:2px 8px;font-size:10px}
+  .wire-bridge{--wire:12px}
+  .start-timer{padding:4px 10px;gap:2px}
+  .start-timer .st-bar{display:none}
+  /* the compacted chrome + the lamp's 150px floor (--lamp) can still add up to
+     more than a very short viewport (e.g. ~320px tall) — let this column
+     scroll rather than silently clip under the two-column mode's overflow:hidden */
+  .game-zone{overflow-y:auto;-webkit-overflow-scrolling:touch}
+}
+
+/* ── DESKTOP refine (≥1024, landscape only) — keep the lamp the hero: fill the
+      game zone and cap the control row so the tall autopilot can never starve
+      the lamp. Portrait tablets at this width fall through to the tablet
+      two-column rules instead (see the tablet media query below). ── */
+@media(min-width:1024px) and (min-aspect-ratio:1/1){
+  .hdr{padding:10px 24px 8px}                   /* slimmer chrome → bigger lamp on short laptops */
+  .volt-zone{min-height:58px}
+  .game-zone{gap:clamp(4px,1vh,10px)}
+  .start-timer{padding:7px 14px}
+  .controls{max-height:clamp(188px,25vh,300px)}
+  .auto-card{display:flex;flex-direction:column;min-height:0}
+  .auto-card .auto-grid{flex:1 1 auto;overflow-y:auto;min-height:0;
+    scrollbar-width:thin;scrollbar-color:var(--brd2) transparent}
+  .lamp-card{display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:stretch}
+  .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:min(64vh,620px);align-self:center}
+  .lbtn{min-height:0;font-size:var(--fs-lbtn)}
+}
+
+/* ── PRIORITY 2 — КОРОТКИЕ ЛАНДШАФТЫ (≤850px высоты: планшеты в альбомной,
+      небольшие ноутбуки): зона схемных узлов тянется на ВСЮ ширину без пустот,
+      инфо-колонка (статус · переключения · личный ×) уезжает ВБОК от лампы,
+      лампа забирает всю высоту зоны ── */
+@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-height:850px) and (max-aspect-ratio:2/1){
+  .lamp-card{align-self:stretch;width:auto;max-width:none;margin-inline:0;
+    grid-template-columns:minmax(0,1fr) minmax(150px,auto);grid-template-rows:100%;
+    align-items:center;justify-items:center;column-gap:clamp(10px,2vw,26px);
+    padding:10px clamp(14px,2.6vw,30px)}
+  .lamp-outer{grid-column:1;grid-row:1;width:auto;height:100%;aspect-ratio:1;
+    max-width:100%;max-height:none;justify-self:center}
+  .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;
+    gap:clamp(6px,1.4vh,14px)}
+  .pers-box{padding:4px 12px;min-width:150px}
+  .start-timer{padding:6px 14px}
+  .controls{max-height:clamp(190px,26vh,260px)}
+  .auto-card .auto-grid{min-height:80px}
+}
+
+/* ── ANY TOUCH DEVICE — pointer capability, not viewport width, decides tap
+      targets. Catches touchscreen laptops/2-in-1s (Surface, touch Chromebooks)
+      that report a desktop-width viewport but are still operated by finger ── */
+@media (pointer:coarse){
+  .info-btn{width:max(40px,var(--tap));height:max(40px,var(--tap))}
+  .lb-close,.sheet-close,.modal-close{width:max(30px,var(--tap));height:max(30px,var(--tap))}
+  .as-num-tog{min-height:var(--tap)}
+  .as-input,.bet-amount{font-size:max(16px,1em)}   /* ≥16px → no browser auto-zoom on focus */
+  .lb-tab{min-height:var(--tap)}
+}
+/* очень узкие телефоны: в шапке теперь 4 кнопки (добавился динамик) — уплотняем,
+   баланс при нехватке места усекается многоточием, а не вылезает */
+@media(max-width:430px){
+  .hdr{padding:10px 8px 8px}
+  .hdr-right{gap:5px;min-width:0}
+  .logo{flex-shrink:0}
+  .logo-wm{font-size:15px}
+  .bal-lbl{display:none}
+  .bal-chip{padding:6px 8px;min-width:0}
+  .info-btn{width:clamp(37px,9.4vw,44px);height:clamp(37px,9.4vw,44px)}
+}
+
+/* ── KEYBOARD FOCUS — visible ring for any input method (keyboard, switch,
+      remote), on every device. The three panel toggles are hidden checkboxes;
+      when Tab lands on one, ring the button the user actually sees instead ── */
+button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visible,
+.info-btn:focus-visible,.lb-tab:focus-visible,.lb-row:focus-visible,
+.as-input:focus-visible,input.bet-amount:focus-visible,.stage-en:focus-visible,
+.lb-close:focus-visible,.sheet-close:focus-visible,.modal-close:focus-visible{
+  outline:2px solid var(--p);outline-offset:2px;border-radius:inherit}
+#infoToggle:focus-visible ~ .app .info-btn[for="infoToggle"],
+#lbToggle:focus-visible ~ .app .lb-open-btn,
+#autoToggle:focus-visible ~ .app .auto-open-btn,
+#sndToggle:focus-visible ~ .app .info-btn[for="sndToggle"]{
+  outline:2px solid var(--p);outline-offset:2px}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v13 — DESKTOP COCKPIT  ·  controls move to a rail BETWEEN the lamp zone and the
+   leaderboard, so the lamp zone becomes tall + square and the lamp scales up to
+   fill it (fixes the tiny-lamp-in-a-wide-empty-zone feel). ≥1024px landscape only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── PRIORITY 3 — COCKPIT: only for ultrawide (≥2:1), where neither the standard nor
+      the C play-dock keeps a good lamp ratio; controls move to a rail between lamp+LB. */
+@media(min-width:1024px) and (min-aspect-ratio:2/1){
+  .main-content{display:grid;grid-template-columns:minmax(0,1fr) clamp(272px,22vw,352px);
+    grid-template-areas:"game ctrl";gap:clamp(14px,1.5vw,22px);align-items:stretch;overflow:hidden}
+  .game-zone{grid-area:game;display:flex;flex-direction:column;min-width:0;min-height:0;gap:clamp(6px,1.2vh,14px)}
+  /* control rail: ON/OFF + bet + autopilot stacked, scrolls if the rail is short */
+  .controls{grid-area:ctrl;display:flex;flex-direction:column;min-width:0;min-height:0;max-height:none;
+    overflow-y:auto;gap:clamp(10px,1.4vh,16px);align-items:stretch;
+    scrollbar-width:thin;scrollbar-color:var(--brd2) transparent}
+  .bet-zone{flex:0 0 auto;flex-direction:column;gap:clamp(10px,1.4vh,16px)}
+  .bet-card,.lamp-ctrl,.auto-card{flex:0 0 auto}
+  .auto-card{display:block;min-height:auto;max-height:none}
+  .auto-card .auto-grid{grid-template-columns:1fr;overflow:visible;min-height:auto;flex:0 0 auto}
+  /* the lamp fills the now tall/square zone */
+  .lamp-card{flex:1 1 auto;display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:stretch}
+  .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:min(70vh,680px);align-self:center}
+  .lbtn{min-height:clamp(60px,8vh,104px);font-size:var(--fs-lbtn)}
+}
+
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="infoToggle" class="vis-toggle" aria-hidden="true">
+<input type="checkbox" id="lbToggle" class="vis-toggle" aria-hidden="true">
+<input type="checkbox" id="autoToggle" class="vis-toggle" aria-hidden="true">
+<input type="checkbox" id="sndToggle" class="vis-toggle" aria-hidden="true">
+
+<div class="app m-1x">
+
+  <!-- CIRCUIT-NODE BACKGROUND — traces carry current, vias (nodes) pulse; tinted by tier -->
+  <div class="pcb-bg" aria-hidden="true">
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      <g>
+        <path class="pcb-trace" d="M-20,120 H180 V300 H420 V180 H700 V360 H980 V140 H1220"/>
+        <path class="pcb-trace" d="M-20,680 H160 V480 H380 V600 H640 V440 H900 V620 H1220"/>
+        <path class="pcb-trace" d="M120,-20 V160 H300 V380 H120"/>
+        <path class="pcb-trace" d="M1080,-20 V200 H860 V420 H1080 V820"/>
+        <path class="pcb-trace" d="M600,820 V560 H760 V300 H600 V40"/>
+        <path class="pcb-trace" d="M-20,420 H120 V520 H300"/>
+      </g>
+      <g>
+        <path class="pcb-current"    d="M-20,120 H180 V300 H420 V180 H700 V360 H980 V140 H1220"/>
+        <path class="pcb-current c2" d="M-20,680 H160 V480 H380 V600 H640 V440 H900 V620 H1220"/>
+        <path class="pcb-current c3" d="M1080,-20 V200 H860 V420 H1080 V820"/>
+        <path class="pcb-current c4" d="M600,820 V560 H760 V300 H600 V40"/>
+        <path class="pcb-current c5" d="M120,-20 V160 H300 V380 H120"/>
+      </g>
+      <g>
+        <circle class="pcb-pad" cx="180" cy="300" r="6"/><circle class="pcb-node" cx="180" cy="300" r="3"/>
+        <circle class="pcb-pad" cx="420" cy="180" r="6"/><circle class="pcb-node" cx="420" cy="180" r="3"/>
+        <circle class="pcb-pad" cx="700" cy="360" r="6"/><circle class="pcb-node" cx="700" cy="360" r="3"/>
+        <circle class="pcb-pad" cx="980" cy="140" r="6"/><circle class="pcb-node" cx="980" cy="140" r="3"/>
+        <circle class="pcb-pad" cx="380" cy="600" r="6"/><circle class="pcb-node" cx="380" cy="600" r="3"/>
+        <circle class="pcb-pad" cx="640" cy="440" r="6"/><circle class="pcb-node" cx="640" cy="440" r="3"/>
+        <circle class="pcb-pad" cx="900" cy="620" r="6"/><circle class="pcb-node" cx="900" cy="620" r="3"/>
+        <circle class="pcb-pad" cx="860" cy="420" r="6"/><circle class="pcb-node" cx="860" cy="420" r="3"/>
+        <circle class="pcb-pad" cx="760" cy="300" r="6"/><circle class="pcb-node" cx="760" cy="300" r="3"/>
+        <circle class="pcb-pad" cx="300" cy="380" r="6"/><circle class="pcb-node" cx="300" cy="380" r="3"/>
+        <circle class="pcb-pad" cx="120" cy="520" r="6"/><circle class="pcb-node" cx="120" cy="520" r="3"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="hist-bar">
+    <span class="hist-lbl">history</span>
+    <span class="hc hc-b">x1.00</span><span class="hc hc-l">x1.82</span>
+    <span class="hc hc-h">x8.34</span><span class="hc hc-m">x3.71</span>
+    <span class="hc hc-b">x1.00</span><span class="hc hc-l">x2.01</span>
+    <span class="hc hc-h">x14.5</span><span class="hc hc-l">x2.09</span>
+    <span class="hc hc-m">x4.88</span><span class="hc hc-l">x1.77</span>
+  </div>
+
+  <div class="hdr">
+    <div class="logo">
+      <div class="logo-wm" aria-label="VOLTA">
+        <span>V</span>
+        <span class="wm-o">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="8.6" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M12 3 L6 11 H11 L8.5 17 L14.5 9 H9.5 Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span>LTA</span>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <label class="info-btn" for="sndToggle" role="button" aria-label="Sound settings" onclick="sndPopPos()">
+        <svg class="snd-ico" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2.2 6.2v3.6h2.5L8.6 13V3L4.7 6.2H2.2z" fill="currentColor"/>
+          <path d="M10.6 5.6a3.1 3.1 0 0 1 0 4.8M12.3 3.9a5.5 5.5 0 0 1 0 8.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </label>
+      <label class="info-btn auto-open-btn" for="autoToggle" role="button" aria-label="Autoplay">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M2.5 4.5h6M11 4.5h2.5M2.5 11.5h2.5M8 11.5h5.5" stroke-linecap="round"/>
+          <circle cx="9.5" cy="4.5" r="1.7" fill="currentColor" stroke="none"/>
+          <circle cx="5" cy="11.5" r="1.7" fill="currentColor" stroke="none"/>
+        </svg>
+      </label>
+      <label class="info-btn lb-open-btn" for="lbToggle" role="button" aria-label="Leaderboard">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <rect x="1" y="6" width="3.6" height="9" rx="1"/>
+          <rect x="6.2" y="2" width="3.6" height="13" rx="1"/>
+          <rect x="11.4" y="9" width="3.6" height="6" rx="1"/>
+        </svg>
+      </label>
+      <label class="info-btn" for="infoToggle" role="button" aria-label="How to play">i</label>
+      <div class="bal-chip">
+        <div class="bal-lbl">balance</div>
+        <div class="bal-val" id="balV">$10,000</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+
+    <div class="game-zone">
+      <div class="volt-zone">
+        <div class="bat-block">
+          <svg viewBox="0 0 40 58" class="bat-body" id="batSvg">
+            <rect x="12" y="0" width="16" height="5" rx="2" fill="currentColor" opacity=".5"/>
+            <rect x="1" y="5" width="38" height="48" rx="5" fill="color-mix(in srgb,currentColor 6%,transparent)" stroke="currentColor" stroke-width="1.5"/>
+            <g id="batSegs">
+              <rect class="bat-seg" x="5" y="43" width="30" height="7" rx="2"/>
+              <rect class="bat-seg" x="5" y="35" width="30" height="7" rx="2"/>
+              <rect class="bat-seg" x="5" y="27" width="30" height="7" rx="2"/>
+              <rect class="bat-seg" x="5" y="19" width="30" height="7" rx="2"/>
+              <rect class="bat-seg" x="5" y="11" width="30" height="7" rx="2"/>
+            </g>
+            <path d="M4 10 Q4 7 7 7 L33 7 Q36 7 36 10 L36 13 Q20 9 4 13 Z" fill="rgba(255,255,255,.1)"/>
+          </svg>
+          <div class="bat-connector"></div>
+        </div>
+
+        <div class="curr-track">
+          <div class="curr-label">voltage<span class="status-txt" id="statusTxt" hidden>idle</span></div>
+          <div class="wire-wrap">
+            <svg class="arc-svg" viewBox="0 0 400 26" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="plugCu" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#e8b36a"/>
+                  <stop offset="45%" stop-color="#b97f3e"/>
+                  <stop offset="100%" stop-color="#6b451d"/>
+                </linearGradient>
+                <linearGradient id="plugL" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ff8cbe"/>
+                  <stop offset="45%" stop-color="#c23a78"/>
+                  <stop offset="100%" stop-color="#5e1840"/>
+                </linearGradient>
+                <linearGradient id="plugR" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#b3a1ff"/>
+                  <stop offset="45%" stop-color="#5f4bc9"/>
+                  <stop offset="100%" stop-color="#2c2166"/>
+                </linearGradient>
+              </defs>
+              <path class="arc-base" d="M23,13 L377,13"/>
+              <!-- 8 форм разряда; активную переключает JS (boltTick).
+                   Каждая форма — белое ядро + цветные нити (розовая, индиго,
+                   белёсая) + короткие ответвления, как у теслова разряда -->
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C70 2 120 22 170 10 S280 18 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C90 20 160 4 230 15 S330 8 377 13"/>
+                <path class="b-br br-w"  d="M178 6 q12 -6 24 -3 M258 17 q10 7 20 6"/>
+                <path class="b-core" d="M23 13 L54 10 L78 5 L102 15 L128 8 L154 16 L178 6 L204 14 L230 9 L258 17 L284 8 L310 15 L338 10 L377 13 M128 8 L138 2 M258 17 L268 23"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C80 24 140 4 200 14 S320 20 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C60 6 130 20 190 8 S310 4 377 13"/>
+                <path class="b-br br-w"  d="M202 5 q-10 -5 -20 -4 M100 10 q8 8 18 9"/>
+                <path class="b-core" d="M23 13 L50 15 L74 20 L100 10 L126 17 L150 7 L176 15 L202 5 L228 13 L256 18 L282 9 L308 16 L336 11 L377 13 M100 10 L92 3 M282 9 L292 4"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C86 6 128 22 188 9 S300 22 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C70 18 150 2 220 13 S330 18 377 13"/>
+                <path class="b-br br-w"  d="M248 5 q12 -4 22 0 M140 14 q-8 8 -18 8"/>
+                <path class="b-core" d="M23 13 L60 12 L88 18 L112 6 L140 14 L168 20 L194 8 L222 15 L248 5 L276 12 L304 18 L332 8 L377 13 M112 6 L120 1 M222 15 L232 22"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C64 22 118 2 176 12 S316 22 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C96 8 168 20 240 7 S330 4 377 13"/>
+                <path class="b-br br-w"  d="M98 4 q-8 -3 -16 -1 M290 19 q10 5 20 3"/>
+                <path class="b-core" d="M23 13 L48 9 L72 14 L98 4 L124 12 L152 19 L180 9 L208 16 L236 6 L262 14 L290 19 L316 7 L344 12 L377 13 M180 9 L172 2 M316 7 L326 2"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C74 4 136 22 198 8 S312 20 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C88 18 170 6 250 16 S340 10 377 13"/>
+                <path class="b-br br-w"  d="M136 5 q10 -4 20 -2 M300 14 q8 6 18 5"/>
+                <path class="b-core" d="M23 13 L56 16 L82 8 L108 17 L136 5 L162 13 L190 19 L216 7 L244 15 L272 6 L300 14 L328 18 L356 9 L377 13 M136 5 L146 1 M244 15 L236 22"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C60 20 132 4 204 16 S324 6 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C100 24 180 8 260 18 S344 14 377 13"/>
+                <path class="b-br br-w"  d="M296 5 q10 -4 20 -1 M132 18 q-10 6 -20 5"/>
+                <path class="b-core" d="M23 13 L52 11 L80 16 L104 8 L132 18 L158 6 L186 14 L214 20 L240 8 L268 16 L296 5 L322 13 L350 16 L377 13 M296 5 L306 1 M104 8 L96 2"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C90 4 150 22 210 6 S320 18 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C70 16 160 24 250 10 S340 20 377 13"/>
+                <path class="b-br br-w"  d="M226 5 q-12 -4 -22 -2 M144 21 q10 4 20 2"/>
+                <path class="b-core" d="M23 13 L62 14 L90 7 L118 15 L144 21 L172 10 L200 17 L226 5 L254 13 L280 19 L308 10 L336 17 L362 11 L377 13 M226 5 L216 1 M280 19 L290 24"/>
+              </g>
+              <g class="bolt">
+                <path class="b-br br-pk" d="M23 13 C66 6 140 20 214 8 S330 22 377 13"/>
+                <path class="b-br br-b"  d="M23 13 C104 16 190 2 276 14 S350 8 377 13"/>
+                <path class="b-br br-w"  d="M178 22 q12 4 24 2 M70 6 q-8 -5 -16 -4"/>
+                <path class="b-core" d="M23 13 L46 12 L70 6 L96 14 L122 7 L150 16 L178 22 L206 9 L232 16 L260 7 L288 13 L314 19 L342 6 L377 13 M178 22 L188 25 M70 6 L62 1"/>
+              </g>
+              <!-- разъём из блока батареи (компактный) -->
+              <g>
+                <rect x="0" y="8.5" width="12" height="9" rx="2.4" fill="url(#plugL)"/>
+                <rect x="11.5" y="10.2" width="6" height="5.6" rx="1.3" fill="url(#plugCu)"/>
+                <path d="M17.5 11.4 L21.5 13 L17.5 14.6" fill="none" stroke="#e8b36a" stroke-width=".9"/>
+                <circle class="tip-spark" cx="23" cy="13" r="1.9"/>
+              </g>
+              <!-- разъём из блока общего множителя (компактный) -->
+              <g>
+                <rect x="388" y="8.5" width="12" height="9" rx="2.4" fill="url(#plugR)"/>
+                <rect x="382.5" y="10.2" width="6" height="5.6" rx="1.3" fill="url(#plugCu)"/>
+                <path d="M382.5 11.4 L378.5 13 L382.5 14.6" fill="none" stroke="#e8b36a" stroke-width=".9"/>
+                <circle class="tip-spark" cx="377" cy="13" r="1.9"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="recv-block">
+          <div class="recv-mult" id="multEl">x1.00</div>
+        </div>
+      </div>
+
+      <div class="wire-bridge w-off" aria-hidden="true">
+        <i class="wire-v1"></i><i class="wire-h"></i><i class="wire-v2"></i><span class="wire-node"></span>
+      </div>
+
+      <div class="lamp-card">
+        <!-- LAMP-ZONE CIRCUIT — PCB tile (mask) repeated to fill the zone, tinted by the tier
+             colour and scrolled so current flows through the vias. Two layers: faint drifting
+             traces + a slower, brighter node layer that pulses. -->
+        <div class="lamp-pcb lamp-pcb-far" aria-hidden="true"></div>
+        <div class="lamp-pcb" id="lampPcb" aria-hidden="true"></div>
+        <!-- runner routes spread proportionally over a 4×3 grid of the zone; each new tier
+             colour reveals a NEW group of routes (in fresh regions) with their own runners -->
+        <svg class="lamp-flow" aria-hidden="true" viewBox="0 0 1200 560" preserveAspectRatio="none">
+          <g class="lf-g lf-g1">
+            <path class="lf-line" d="M20,230 H180 V340 H300"/><path class="lf-dot d1" pathLength="100" d="M20,230 H180 V340 H300"/>
+            <path class="lf-line" d="M280,250 H120 V360 H20"/><path class="lf-dot d13" pathLength="100" d="M280,250 H120 V360 H20"/>
+            <path class="lf-line" d="M320,150 H480 V60 H600"/><path class="lf-dot d2" pathLength="100" d="M320,150 H480 V60 H600"/>
+            <path class="lf-line" d="M600,120 H440 V30 H320"/><path class="lf-dot d14" pathLength="100" d="M600,120 H440 V30 H320"/>
+            <path class="lf-line" d="M920,410 H1080 V520 H1180"/><path class="lf-dot d3" pathLength="100" d="M920,410 H1080 V520 H1180"/>
+            <path class="lf-line" d="M1180,440 H1020 V380 H900"/><path class="lf-dot d15" pathLength="100" d="M1180,440 H1020 V380 H900"/>
+            <circle class="lf-node" cx="180" cy="230" r="4"/><circle class="lf-node" cx="180" cy="340" r="4"/><circle class="lf-node" cx="480" cy="150" r="4"/><circle class="lf-node" cx="480" cy="60" r="4"/><circle class="lf-node" cx="1080" cy="410" r="4"/><circle class="lf-node" cx="120" cy="360" r="4"/><circle class="lf-node" cx="440" cy="120" r="4"/><circle class="lf-node" cx="1020" cy="380" r="4"/>
+          </g>
+          <g class="lf-g lf-g2">
+            <path class="lf-line" d="M620,250 H780 V360 H900"/><path class="lf-dot d4" pathLength="100" d="M620,250 H780 V360 H900"/>
+            <path class="lf-line" d="M900,300 H700 V210 H620"/><path class="lf-dot d16" pathLength="100" d="M900,300 H700 V210 H620"/>
+            <circle class="lf-node" cx="780" cy="250" r="4"/><circle class="lf-node" cx="780" cy="360" r="4"/><circle class="lf-node" cx="700" cy="210" r="4"/>
+          </g>
+          <g class="lf-g lf-g3">
+            <path class="lf-line" d="M20,70 H120 V170 H280"/><path class="lf-dot d5" pathLength="100" d="M20,70 H120 V170 H280"/>
+            <path class="lf-line" d="M280,140 H160 V40 H20"/><path class="lf-dot d17" pathLength="100" d="M280,140 H160 V40 H20"/>
+            <path class="lf-line" d="M1180,60 H1020 V180 H900"/><path class="lf-dot d6" pathLength="100" d="M1180,60 H1020 V180 H900"/>
+            <path class="lf-line" d="M900,120 H1060 V30 H1180"/><path class="lf-dot d18" pathLength="100" d="M900,120 H1060 V30 H1180"/>
+            <circle class="lf-node" cx="120" cy="70" r="4"/><circle class="lf-node" cx="120" cy="170" r="4"/><circle class="lf-node" cx="1020" cy="60" r="4"/><circle class="lf-node" cx="1020" cy="180" r="4"/><circle class="lf-node" cx="160" cy="140" r="4"/><circle class="lf-node" cx="1060" cy="120" r="4"/>
+          </g>
+          <g class="lf-g lf-g4">
+            <path class="lf-line" d="M320,500 H500 V400 H560"/><path class="lf-dot d7" pathLength="100" d="M320,500 H500 V400 H560"/>
+            <path class="lf-line" d="M560,460 H400 V540 H320"/><path class="lf-dot d19" pathLength="100" d="M560,460 H400 V540 H320"/>
+            <circle class="lf-node" cx="500" cy="500" r="4"/><circle class="lf-node" cx="500" cy="400" r="4"/><circle class="lf-node" cx="400" cy="540" r="4"/>
+          </g>
+          <g class="lf-g lf-g5">
+            <path class="lf-line" d="M620,60 H760 V180 H880"/><path class="lf-dot d8" pathLength="100" d="M620,60 H760 V180 H880"/>
+            <path class="lf-line" d="M880,120 H700 V40 H620"/><path class="lf-dot d20" pathLength="100" d="M880,120 H700 V40 H620"/>
+            <path class="lf-line" d="M40,400 H200 V520 H300"/><path class="lf-dot d9" pathLength="100" d="M40,400 H200 V520 H300"/>
+            <path class="lf-line" d="M300,460 H140 V380 H40"/><path class="lf-dot d21" pathLength="100" d="M300,460 H140 V380 H40"/>
+            <circle class="lf-node" cx="760" cy="60" r="4"/><circle class="lf-node" cx="760" cy="180" r="4"/><circle class="lf-node" cx="200" cy="400" r="4"/><circle class="lf-node" cx="200" cy="520" r="4"/><circle class="lf-node" cx="700" cy="120" r="4"/><circle class="lf-node" cx="140" cy="380" r="4"/>
+          </g>
+          <g class="lf-g lf-g6">
+            <path class="lf-line" d="M1180,240 H1020 V360 H940"/><path class="lf-dot d10" pathLength="100" d="M1180,240 H1020 V360 H940"/>
+            <path class="lf-line" d="M940,300 H1100 V210 H1180"/><path class="lf-dot d22" pathLength="100" d="M940,300 H1100 V210 H1180"/>
+            <circle class="lf-node" cx="1020" cy="240" r="4"/><circle class="lf-node" cx="1020" cy="360" r="4"/><circle class="lf-node" cx="1100" cy="210" r="4"/>
+          </g>
+          <g class="lf-g lf-g7">
+            <path class="lf-line" d="M380,240 H540 V330 H600"/><path class="lf-dot d11" pathLength="100" d="M380,240 H540 V330 H600"/>
+            <path class="lf-line" d="M600,300 H460 V210 H380"/><path class="lf-dot d23" pathLength="100" d="M600,300 H460 V210 H380"/>
+            <path class="lf-line" d="M620,510 H780 V410 H900"/><path class="lf-dot d12" pathLength="100" d="M620,510 H780 V410 H900"/>
+            <path class="lf-line" d="M900,460 H720 V540 H620"/><path class="lf-dot d24" pathLength="100" d="M900,460 H720 V540 H620"/>
+            <circle class="lf-node" cx="540" cy="240" r="4"/><circle class="lf-node" cx="540" cy="330" r="4"/><circle class="lf-node" cx="780" cy="510" r="4"/><circle class="lf-node" cx="780" cy="410" r="4"/><circle class="lf-node" cx="460" cy="210" r="4"/><circle class="lf-node" cx="720" cy="540" r="4"/>
+          </g>
+        </svg>
+        <div class="lamp-vig" aria-hidden="true"></div>
+        <div class="lamp-outer">
+          <div class="lamp-smoke" aria-hidden="true"></div>
+          <div class="lamp-ring-mask"></div>
+          <div class="lamp-ring-anim" id="ringAnim"></div>
+          <svg class="lamp-ring-svg" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="3"/>
+            <circle id="lampRing" cx="40" cy="40" r="36" fill="none" stroke="var(--p)" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="0 226" transform="rotate(-90 40 40)" opacity=".6"/>
+          </svg>
+          <!-- ЛАМПА ПО ФОТО-РЕФЕРЕНСАМ: колба A19, штенгель, V-держатели,
+               горизонтальная спираль, ребристый металлический цоколь -->
+          <svg class="lamp-svg is-off" viewBox="0 0 88 104">
+            <defs>
+              <filter id="glf"><feGaussianBlur stdDeviation="8" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <!-- стекло: полупрозрачное, темнее к краям -->
+              <radialGradient id="glassGrad" cx="42%" cy="32%" r="75%">
+                <stop offset="0%"  stop-color="#2a2438" stop-opacity=".28"/>
+                <stop offset="45%" stop-color="#191428" stop-opacity=".4"/>
+                <stop offset="82%" stop-color="#0e0a18" stop-opacity=".62"/>
+                <stop offset="100%" stop-color="#0a0714" stop-opacity=".78"/>
+              </radialGradient>
+              <!-- объём: свет сверху-слева, тень к краям -->
+              <radialGradient id="bulbShade" cx="38%" cy="26%" r="80%">
+                <stop offset="0%" stop-color="#fff" stop-opacity=".07"/>
+                <stop offset="45%" stop-color="#fff" stop-opacity="0"/>
+                <stop offset="82%" stop-color="#000" stop-opacity=".26"/>
+                <stop offset="100%" stop-color="#000" stop-opacity=".45"/>
+              </radialGradient>
+              <radialGradient id="glintGrad" cx="46%" cy="38%" r="60%">
+                <stop offset="0%" stop-color="#fff" stop-opacity=".5"/>
+                <stop offset="35%" stop-color="#fff" stop-opacity=".22"/>
+                <stop offset="70%" stop-color="#fff" stop-opacity=".06"/>
+                <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+              </radialGradient>
+              <!-- раскалённый газ вокруг спирали (цвет тира) -->
+              <radialGradient id="innerGrad" cx="50%" cy="42%" r="58%">
+                <stop offset="0%"  style="stop-color:var(--m-color)" stop-opacity=".85"/>
+                <stop offset="55%" style="stop-color:var(--m-color)" stop-opacity=".3"/>
+                <stop offset="100%" style="stop-color:var(--m-color)" stop-opacity="0"/>
+              </radialGradient>
+              <!-- металл цоколя: цилиндрическая светотень (фиолетовая сталь) -->
+              <linearGradient id="sockMetal" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#241a38"/>
+                <stop offset="30%" stop-color="#4a3d68"/>
+                <stop offset="50%" stop-color="#7a6c9e"/>
+                <stop offset="72%" stop-color="#40345c"/>
+                <stop offset="100%" stop-color="#1c1430"/>
+              </linearGradient>
+              <linearGradient id="collarGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#1a1228"/>
+                <stop offset="50%" stop-color="#3c3158"/>
+                <stop offset="100%" stop-color="#171021"/>
+              </linearGradient>
+              <clipPath id="bulbClip">
+                <path d="M23 42 Q23 12 44 12 Q65 12 65 42 Q65 58 56 67 Q50 72 50 79 L38 79 Q38 72 32 67 Q23 58 23 42 Z"/>
+              </clipPath>
+            </defs>
+
+            <!-- внешний ореол -->
+            <ellipse id="lampGlow" cx="44" cy="40" rx="18" ry="22" class="lamp-glo" fill="var(--lamp-glow)" filter="url(#glf)"/>
+            <!-- свечение газа внутри колбы -->
+            <ellipse id="lampInner" cx="44" cy="38" rx="16" ry="21" fill="url(#innerGrad)"/>
+
+            <!-- целая колба -->
+            <path id="lampBulb" d="M23 42 Q23 12 44 12 Q65 12 65 42 Q65 58 56 67 Q50 72 50 79 L38 79 Q38 72 32 67 Q23 58 23 42 Z"
+              fill="url(#glassGrad)" stroke="var(--lamp-line)" stroke-width="1.4"/>
+            <!-- объём + блики: клип контуром колбы, за стекло не выходят -->
+            <g class="bulb-gloss" clip-path="url(#bulbClip)">
+              <path d="M23 42 Q23 12 44 12 Q65 12 65 42 Q65 58 56 67 Q50 72 50 79 L38 79 Q38 72 32 67 Q23 58 23 42 Z"
+                fill="url(#bulbShade)"/>
+              <!-- единственный точечный блик: мягкое пятно, лежит по кривизне
+                   стекла и обрезано контуром колбы -->
+              <ellipse cx="33.5" cy="25.5" rx="4.6" ry="8.2" fill="url(#glintGrad)"
+                transform="rotate(-21 33.5 25.5)"/>
+            </g>
+
+            <!-- разбитая колба: нижняя половина с рваным краем (краш) -->
+            <g id="bulbBroken" aria-hidden="true">
+              <path d="M23 42 Q23 36 24.5 31 L29 41 L34 30 L38 43 L44 32 L49 44 L54 31 L59 41 L63.5 33 Q65 37 65 42 Q65 58 56 67 Q50 72 50 79 L38 79 Q38 72 32 67 Q23 58 23 42 Z"
+                fill="url(#glassGrad)" stroke="var(--lamp-line)" stroke-width="1.4"/>
+              <path class="rim" d="M24.5 31 L29 41 L34 30 L38 43 L44 32 L49 44 L54 31 L59 41 L63.5 33"/>
+            </g>
+
+            <!-- штенгель (стеклянная ножка) -->
+            <path d="M41 79 L41 58 Q41 53.5 44 53.5 Q47 53.5 47 58 L47 79"
+              fill="rgba(255,255,255,.028)" stroke="rgba(255,255,255,.13)" stroke-width=".9"/>
+            <!-- V-держатели спирали + крючки -->
+            <path d="M44 55 L34 32 M44 55 L54 32 M34 32 L34 30 M54 32 L54 30"
+              fill="none" stroke="#8d84a4" stroke-width=".9" stroke-linecap="round"/>
+
+            <!-- спираль: горизонтальная катушка между держателями -->
+            <path id="lampFil" class="lamp-fil"
+              d="M34 30 q2 -4.6 4 0 q2 4.6 4 0 q2 -4.6 4 0 q2 4.6 4 0 q2 -4.6 4 0"
+              fill="none" stroke="var(--p)" stroke-width="1.7" stroke-linecap="round"/>
+            <!-- порванная спираль: две провисшие половинки -->
+            <path id="lampFilBroken"
+              d="M34 30 q2 -4.6 4 0 l1.6 4.6 l.6 3.4 M54 30 q-2 -4.6 -4 0 l-1.2 4.2"
+              fill="none" stroke="#6e5666" stroke-width="1.7" stroke-linecap="round"/>
+
+            <!-- осколки: разлетаются вверх и в стороны при краше -->
+            <g aria-hidden="true">
+              <polygon class="shard s1" points="28,16 35,13 32,22"/>
+              <polygon class="shard s2" points="41,10 48,12 44,19"/>
+              <polygon class="shard s3" points="54,15 60,19 53,22"/>
+              <polygon class="shard s4" points="24,26 30,29 25,33"/>
+              <polygon class="shard s5" points="60,26 64,30 58,32"/>
+              <polygon class="shard s6" points="37,20 42,17 40,25"/>
+            </g>
+
+            <!-- цоколь: воротник, резьба с рёбрами, контакт -->
+            <rect x="35.5" y="79" width="17" height="3.5" rx="1.2" fill="url(#collarGrad)"/>
+            <rect x="33.5" y="82.5" width="21" height="13" rx="2" fill="url(#sockMetal)" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
+            <path d="M33.5 85.5 Q44 87.4 54.5 85.5" stroke="rgba(0,0,0,.55)" stroke-width="1.2" fill="none"/>
+            <path d="M33.5 84.6 Q44 86.5 54.5 84.6" stroke="rgba(255,255,255,.1)" stroke-width=".7" fill="none"/>
+            <path d="M33.5 89 Q44 90.9 54.5 89" stroke="rgba(0,0,0,.55)" stroke-width="1.2" fill="none"/>
+            <path d="M33.5 88.1 Q44 90 54.5 88.1" stroke="rgba(255,255,255,.1)" stroke-width=".7" fill="none"/>
+            <path d="M33.5 92.5 Q44 94.4 54.5 92.5" stroke="rgba(0,0,0,.55)" stroke-width="1.2" fill="none"/>
+            <path d="M33.5 91.6 Q44 93.5 54.5 91.6" stroke="rgba(255,255,255,.1)" stroke-width=".7" fill="none"/>
+            <rect x="37.5" y="95.5" width="13" height="3.8" rx="1.5" fill="url(#collarGrad)"/>
+            <ellipse cx="44" cy="100.6" rx="3.2" ry="1.9" fill="#14101f" stroke="rgba(255,255,255,.06)" stroke-width=".5"/>
+          </svg>
+        </div>
+        <div class="lamp-info-col">
+          <div class="state-badge" id="stateBadge">&#9679; idle</div>
+          <div class="sw-row" id="swRow">
+            <div class="sw u"></div><div class="sw u"></div><div class="sw u"></div><div class="sw u"></div>
+          </div>
+          <div class="pers-box">
+            <div class="pers-lbl">personal &times;</div>
+            <div class="pers-val" id="persVal">1.00</div>
+            <div class="pers-pay idle" id="persPay">&mdash;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="start-timer" id="startTimer" data-state="count" role="timer" aria-live="off">
+        <div class="st-head">
+          <span class="st-lbl" id="stLbl">starts in</span>
+          <span class="st-sec" id="stSec">5</span>
+        </div>
+        <div class="st-bar"><div class="st-fill" id="stFill"></div></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="bet-zone">
+        <div class="bet-card">
+          <div class="zone-title">bet</div>
+          <div class="bet-inp-wrap">
+            <span class="bet-cur">$</span>
+            <input class="bet-amount" id="betAmt" type="number" inputmode="numeric" value="1" min="1" max="100" step="1" aria-label="Bet amount">
+          </div>
+          <div class="qrow">
+            <button class="qb" type="button" onclick="qb(.5)">1/2</button>
+            <button class="qb" type="button" onclick="qb(2)">x2</button>
+            <button class="qb" type="button" onclick="qbf(50)">50</button>
+            <button class="qb" type="button" onclick="qbf(100)">100</button>
+          </div>
+          <button class="bet-btn" id="betBtn" type="button" onclick="placeBet()">BET</button>
+          <div class="bet-note" id="betNote">bets accepted until the round starts</div>
+        </div>
+        <div class="lamp-ctrl">
+          <div class="zone-title">lamp control</div>
+          <div class="lamp-btns">
+            <button class="lbtn lbtn-on" id="btnOn" type="button" onclick="lampOn()" disabled>ON</button>
+            <button class="lbtn lbtn-off" id="btnOff" type="button" onclick="lampOff()" disabled>OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="auto-card">
+        <div class="sheet-handle"></div>
+        <label class="sheet-close" for="autoToggle" role="button" aria-label="Close">&#215;</label>
+        <div class="auto-head">
+          <span class="zone-title" style="margin:0">autoplay</span>
+          <label class="toggle">
+            <input type="checkbox" class="auto-toggle-input" id="autoEnable" onchange="onAutoMasterToggle()">
+            <span class="tog-track"><span class="tog-knob"></span></span>
+            <span class="tog-lbl">off</span>
+          </label>
+        </div>
+        <div class="auto-grid">
+          <div class="astage" id="autoStage1">
+            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn1" checked onchange="renderAutoStatus()"><span class="as-num">1</span></label>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff1" type="number" value="1.50" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn1" type="number" value="1.70" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+          </div>
+          <div class="astage" id="autoStage2">
+            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn2" checked onchange="renderAutoStatus()"><span class="as-num">2</span></label>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="number" value="2.50" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="number" value="3.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+          </div>
+          <div class="astage" id="autoStage3">
+            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn3" checked onchange="renderAutoStatus()"><span class="as-num">3</span></label>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="number" value="4.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="number" value="5.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+          </div>
+          <div class="astage" id="autoStage4">
+            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn4" checked onchange="renderAutoStatus()"><span class="as-num">4</span></label>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="number" value="7.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="number" value="8.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+          </div>
+        </div>
+        <div class="auto-final" id="autoFinalRow">
+          <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoFinalEn" checked onchange="renderAutoStatus()"><span class="as-num">5</span></label>
+          <div class="as-field">
+            <label class="as-lbl off">final off &times;</label>
+            <input class="as-input off-in" id="autoFinalOff" type="number" value="12.00" step="0.5" min="1.01" onchange="renderAutoStatus()">
+          </div>
+        </div>
+        <div class="auto-status" id="autoStatus" hidden></div>
+      </div>
+    </div>
+
+  </div>
+
+  <aside class="lb-col">
+    <input type="radio" name="lbphase" id="phPre" class="vis-toggle">
+    <input type="radio" name="lbphase" id="phLive" class="vis-toggle" checked>
+    <div class="lb-handle"></div>
+    <label class="lb-close" for="lbToggle" role="button" aria-label="Close leaderboard">&#215;</label>
+    <div class="lb-title">
+      <span class="lb-title-dot" id="lbPhaseDot"></span>
+      <span id="lbPhaseTitle">Pre-round</span>
+    </div>
+
+    <div class="lb-phase lb-phase-1">
+      <div class="lb-summary">
+        <div class="lb-sum-item">
+          <div class="lb-sum-val" id="lbPlayers" style="color:var(--p)">0</div>
+          <div class="lb-sum-lbl">players</div>
+        </div>
+        <div class="lb-sum-item" style="text-align:right">
+          <div class="lb-sum-val" id="lbBets" style="color:var(--gold)">$0</div>
+          <div class="lb-sum-lbl">bets</div>
+        </div>
+      </div>
+      <div class="lb-list" id="lbPreList"></div>
+    </div>
+
+    <div class="lb-phase lb-phase-2">
+      <div class="onoff-bar-wrap">
+        <div class="onoff-bar-row">
+          <div class="onoff-bar"><div class="onoff-fill" id="onoffFill" style="width:50%"></div></div>
+          <span class="onoff-pct" id="onoffPct">50%</span>
+        </div>
+        <div class="onoff-labels"><span class="onoff-on" id="onoffOn">&#9679; ON — 0</span><span class="onoff-off" id="onoffOff">&#9679; OFF — 0</span></div>
+        <div class="lb-round-win" id="lbRoundWin" hidden></div>
+      </div>
+      <div class="lb-list" id="lbLiveList"></div>
+    </div>
+  </aside>
+
+</div>
+
+<label class="lb-backdrop" for="lbToggle" aria-hidden="true"></label>
+<label class="auto-backdrop" for="autoToggle" aria-hidden="true"></label>
+<label class="snd-backdrop" for="sndToggle" aria-hidden="true"></label>
+
+<!-- ПАНЕЛЬ ЗВУКА — всплывает под кнопкой-динамиком в шапке -->
+<div class="snd-pop" role="group" aria-label="Sound settings">
+  <div class="snd-row">
+    <span class="snd-name">sound effects</span>
+    <label class="toggle">
+      <input type="checkbox" class="auto-toggle-input" id="sndEnable" checked onchange="sndSetEnabled(this.checked)">
+      <span class="tog-track"><span class="tog-knob"></span></span>
+    </label>
+  </div>
+  <div class="snd-row">
+    <span class="snd-name">volume</span>
+    <input type="range" class="snd-range" id="sndVol" min="0" max="100" value="80" oninput="sndSetVolume(this.value)" aria-label="Effects volume">
+  </div>
+  <div class="snd-sep"></div>
+  <div class="snd-row">
+    <span class="snd-name">music</span>
+    <label class="toggle">
+      <input type="checkbox" class="auto-toggle-input" id="musEnable" onchange="musSetEnabled(this.checked)">
+      <span class="tog-track"><span class="tog-knob"></span></span>
+    </label>
+  </div>
+  <div class="snd-row">
+    <span class="snd-name">volume</span>
+    <input type="range" class="snd-range" id="musVol" min="0" max="100" value="50" oninput="musSetVolume(this.value)" aria-label="Music volume">
+  </div>
+  <div class="snd-row">
+    <span class="snd-name">track</span>
+    <select class="snd-select" id="musSelect" onchange="musSelectTrack(this.value)" aria-label="Music track"></select>
+  </div>
+</div>
+
+<div class="modal-overlay">
+  <label class="modal-backdrop" for="infoToggle" aria-label="Close"></label>
+  <div class="modal-box">
+    <label class="modal-close" for="infoToggle" role="button" aria-label="Close">&#215;</label>
+    <div class="modal-title">How to play — VOLTA</div>
+    <div class="modal-body">
+      <h3>Bet</h3>
+      <p>Place your amount before the round begins. You can't change the bet once the round is live.</p>
+      <h3>Lamp</h3>
+      <p><span class="hl-on">ON</span> — the lamp is lit, your personal multiplier grows together with the global one.</p>
+      <p><span class="hl-off">OFF</span> — the lamp is off, your multiplier is locked and you're safe.</p>
+      <h3>Crash</h3>
+      <p><span class="hl-on">Lamp ON at the crash:</span> your bet burns.</p>
+      <p><span class="hl-off">Lamp OFF at the crash:</span> you get bet &times; personal multiplier.</p>
+      <h3>Re-toggling</h3>
+      <p>You can switch the lamp on up to <span class="hl-p">4 times</span> per round. Each turn-on keeps stacking the multiplier on top of the previous one.</p>
+      <h3>Autoplay</h3>
+      <p>Set the values and the lamp toggles automatically at the right moments — handy for a pre-planned strategy.</p>
+    </div>
+  </div>
+</div>
+
+<!-- WIN POPUP — slides in after a winning round, shows the player's earnings -->
+<div class="win-pop" id="winPop" hidden onclick="hideWinPop()">
+  <div class="win-pop-card">
+    <div class="win-pop-lbl">
+      <svg viewBox="0 0 20 20" width="11" height="11" style="vertical-align:-1px" aria-hidden="true"><path d="M12 3 L6 11 H11 L8.5 17 L14.5 9 H9.5 Z" fill="currentColor"/></svg>
+      Your win
+    </div>
+    <div class="win-pop-amt" id="winPopAmt">$0</div>
+    <div class="win-pop-sub" id="winPopSub"></div>
+    <div class="win-pop-hint">tap to close</div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   VOLTA — LAMP GAME ENGINE  (Bustabit-accurate math, provably fair)
+   Ported from the VOLTA-v3 prototype and rebound to the synthwave design.
+   Math (crash generation, growth curve, RTP ~97%) is byte-for-byte the
+   prototype's; only the UI bindings changed.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── BUSTABIT CONSTANTS ───────────────────────────────────────────── */
+const TICK_RATE      = 150;
+const AFTER_CRASH_MS = 3000;
+const RESTART_MS     = 5000;
+const CLIENT_SEED    = '000000000000000007a9a31ff7f07463d91af6b5454241d5faf282e5e0fe1b3a';
+const MAX_SWITCHES   = 4;
+const MAX_BET        = 100;      // максимальная ставка игрока — $100
+const DISPLAY_TICK   = 50;
+
+/* ── TWO-PHASE GROWTH (RTP-neutral; only stretches the early zone) ── */
+const R1 = 0.00003, T0 = 7000, R0 = 0.00006;
+const MJOIN = Math.exp(R1 * T0);
+
+function growthFunc(ms){
+  if (ms <= 0) return 100;
+  const M = ms <= T0 ? Math.exp(R1 * ms) : MJOIN * Math.exp(R0 * (ms - T0));
+  return Math.floor(100 * M);
+}
+function inverseGrowth(result){
+  const M = result / 100;
+  if (M <= 1)     return 0;
+  if (M <= MJOIN) return Math.log(M) / R1;
+  return T0 + Math.log(M / MJOIN) / R0;
+}
+function divisible(hash, mod){
+  let val = 0; const o = hash.length % 4;
+  for (let i = o > 0 ? o - 4 : 0; i < hash.length; i += 4)
+    val = ((val << 16) + parseInt(hash.substring(i, i + 4), 16)) % mod;
+  return val === 0;
+}
+/* ── PURE-JS SHA-256 / HMAC-SHA256 ───────────────────────────────────
+   Self-contained so the provably-fair core runs anywhere — including a
+   file:// page opened by double-click, where Web Crypto (crypto.subtle)
+   is disabled. Same algorithm Bustabit uses, so the math is identical. */
+const _K = new Uint32Array([
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function _sha256(msg){                                   // Uint8Array → Uint8Array(32)
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,
+      h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+  const l = msg.length, bitLen = l * 8, withOne = l + 1;
+  const pad = (56 - (withOne % 64) + 64) % 64, total = withOne + pad + 8;
+  const m = new Uint8Array(total);
+  m.set(msg); m[l] = 0x80;
+  const lo = bitLen >>> 0, hi = Math.floor(bitLen / 0x100000000);
+  m[total-8]=(hi>>>24)&255; m[total-7]=(hi>>>16)&255; m[total-6]=(hi>>>8)&255; m[total-5]=hi&255;
+  m[total-4]=(lo>>>24)&255; m[total-3]=(lo>>>16)&255; m[total-2]=(lo>>>8)&255; m[total-1]=lo&255;
+  const w = new Uint32Array(64);
+  for (let i = 0; i < total; i += 64){
+    for (let t = 0; t < 16; t++)
+      w[t] = (m[i+t*4]<<24)|(m[i+t*4+1]<<16)|(m[i+t*4+2]<<8)|m[i+t*4+3];
+    for (let t = 16; t < 64; t++){
+      const s0 = rotr(w[t-15],7)^rotr(w[t-15],18)^(w[t-15]>>>3);
+      const s1 = rotr(w[t-2],17)^rotr(w[t-2],19)^(w[t-2]>>>10);
+      w[t] = (w[t-16]+s0+w[t-7]+s1)|0;
+    }
+    let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+    for (let t = 0; t < 64; t++){
+      const S1 = rotr(e,6)^rotr(e,11)^rotr(e,25), ch = (e&f)^((~e)&g);
+      const t1 = (h+S1+ch+_K[t]+w[t])|0;
+      const S0 = rotr(a,2)^rotr(a,13)^rotr(a,22), maj = (a&b)^(a&c)^(b&c);
+      const t2 = (S0+maj)|0;
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+    }
+    h0=(h0+a)|0; h1=(h1+b)|0; h2=(h2+c)|0; h3=(h3+d)|0;
+    h4=(h4+e)|0; h5=(h5+f)|0; h6=(h6+g)|0; h7=(h7+h)|0;
+  }
+  const out = new Uint8Array(32);
+  [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>{
+    out[i*4]=(v>>>24)&255; out[i*4+1]=(v>>>16)&255; out[i*4+2]=(v>>>8)&255; out[i*4+3]=v&255; });
+  return out;
+}
+function _hmac(key, msg){                                // Uint8Array, Uint8Array → Uint8Array(32)
+  if (key.length > 64) key = _sha256(key);
+  const ip = new Uint8Array(64), op = new Uint8Array(64);
+  for (let i = 0; i < 64; i++){ const k = i < key.length ? key[i] : 0; ip[i]=k^0x36; op[i]=k^0x5c; }
+  const inner = new Uint8Array(64 + msg.length); inner.set(ip); inner.set(msg, 64);
+  const ih = _sha256(inner);
+  const outer = new Uint8Array(96); outer.set(op); outer.set(ih, 64);
+  return _sha256(outer);
+}
+const _enc = new TextEncoder();
+const _hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+
+function crashPointFromHash(serverSeed){
+  const hash = _hex(_hmac(_enc.encode(serverSeed), _enc.encode(CLIENT_SEED)));
+  if (divisible(hash, 40)) return 0;
+  const h = parseInt(hash.slice(0, 13), 16), e = Math.pow(2, 52);
+  return Math.floor((100 * e - h) / (e - h));
+}
+function sha256hex(msg){ return _hex(_sha256(_enc.encode(msg))); }
+function randHex(n = 16){
+  const b = new Uint8Array(n);
+  if (self.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
+  else for (let i = 0; i < n; i++) b[i] = (Math.random() * 256) | 0;
+  return _hex(b);
+}
+
+/* ── STATE ────────────────────────────────────────────────────────── */
+const G = {
+  bal: 10000, round: 0, phase: 'ENDED',
+  serverSeed: null, hash: null, crashPoint: null, gameDuration: null, startTime: null,
+  bet: null, lampOn: false, lampEver: false,
+  switchesLeft: MAX_SWITCHES, switchesUsed: 0,
+  persOnEntry: 1.0, persAccum: 1.0,
+  displayTimer: null, tickTimer: null,
+  auto: { on: false, actions: [] },
+  tier: '',
+  timer: { end: 0, dur: 0, label: 'starts in', state: 'count' },
+};
+
+/* ── DOM SHORTHANDS ───────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const appEl   = document.querySelector('.app');
+const voltEl  = document.querySelector('.volt-zone');
+const wireEl  = document.querySelector('.wire-bridge');
+
+const fmt = (n, dec = 0) => '$' + n.toLocaleString('en-US',
+  { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const addLog = (m) => { try { console.debug('[VOLTA]', m); } catch (e) {} };
+
+/* ═══════════════════════════════════════════════════════════════════
+   SOUND ENGINE — эффекты из ./sounds/*.wav (Web Audio).
+   Если fetch недоступен (игра открыта двойным кликом, file://) — те же
+   звуки синтезируются на лету: sndRender ниже = копия sounds/_generate.js.
+   Настройки (вкл/выкл + громкость) — панель под кнопкой-динамиком,
+   хранятся в localStorage('volta_snd').
+   ═══════════════════════════════════════════════════════════════════ */
+const SND = {
+  names: ['lamp_on','lamp_off','bet','tick','tick_hi','round_start','cashout','crash','voltage_loop'],
+  ctx: null, master: null, buf: {}, src: {}, ready: false,
+  on: true, vol: 0.8,
+  volt: { src: null, gain: null }
+};
+try {
+  const s = JSON.parse(localStorage.getItem('volta_snd') || '{}');
+  if (typeof s.on === 'boolean') SND.on = s.on;
+  if (typeof s.vol === 'number') SND.vol = Math.min(1, Math.max(0, s.vol));
+} catch (e) {}
+function sndSave(){ try { localStorage.setItem('volta_snd', JSON.stringify({ on: SND.on, vol: SND.vol })); } catch (e) {} }
+
+const SND_SR = 22050;
+function sndRender(name){
+  const mk  = s => new Float32Array(Math.round(s * SND_SR));
+  const rnd = () => Math.random() * 2 - 1;
+  const TAU = Math.PI * 2, SR = SND_SR;
+  let d;
+  if (name === 'lamp_on' || name === 'lamp_off'){
+    const up = name === 'lamp_on';
+    d = mk(0.2);
+    for (let i = 0; i < SR * 0.01; i++) d[i] += rnd() * Math.exp(-i / (SR * 0.002)) * 0.9;
+    let ph = 0;
+    for (let i = 0; i < d.length; i++){
+      const t = i / SR, k = Math.min(1, t / 0.13);
+      const f = up ? 220 + 520 * k : 640 - 460 * k;
+      ph += TAU * f / SR;
+      d[i] += Math.sin(ph) * Math.exp(-t * 17) * 0.5;
+    }
+  } else if (name === 'bet'){
+    d = mk(0.18);
+    let ph = 0;
+    for (let i = 0; i < d.length; i++){
+      const t = i / SR, f = t < 0.05 ? 880 : 1318.5;
+      ph += TAU * f / SR;
+      const seg = t < 0.05 ? t : t - 0.05;
+      d[i] = Math.sin(ph) * Math.exp(-seg * 42) * 0.55;
+    }
+  } else if (name === 'tick' || name === 'tick_hi'){
+    const f = name === 'tick' ? 1000 : 1480;
+    d = mk(0.07);
+    let ph = 0;
+    for (let i = 0; i < d.length; i++){
+      const t = i / SR; ph += TAU * f / SR;
+      d[i] = Math.sin(ph) * Math.exp(-t * 85) * 0.55;
+    }
+    for (let i = 0; i < SR * 0.004; i++) d[i] += rnd() * Math.exp(-i / (SR * 0.001)) * 0.25;
+  } else if (name === 'round_start'){
+    d = mk(0.55);
+    let ph = 0, ph2 = 0;
+    for (let i = 0; i < d.length; i++){
+      const t = i / SR, p = Math.min(1, t / 0.4);
+      const f = 120 * Math.pow(7.5, p);
+      ph += TAU * f / SR;
+      const saw = 2 * ((ph / TAU) % 1) - 1;
+      const amp = p * Math.exp(-Math.max(0, t - 0.4) * 14);
+      d[i] = (saw * 0.26 * (0.25 + 0.75 * p) + Math.sin(ph) * 0.22 + rnd() * 0.12 * p) * amp;
+    }
+    const at = Math.round(0.4 * SR);
+    for (let i = 0; i < SR * 0.14; i++){
+      const t = i / SR, f = 180 * Math.exp(-t * 9);
+      ph2 += TAU * f / SR;
+      const j = at + i; if (j >= d.length) break;
+      d[j] += Math.sin(ph2) * Math.exp(-t * 20) * 0.7;
+    }
+  } else if (name === 'cashout'){
+    // КАССА «ча-чинь»: низкий стук ящика + два звонка + сыплются монеты
+    d = mk(1.05);
+    let phd = 0;
+    for (let i = 0; i < SR * 0.12; i++){
+      const t = i / SR, f = 90 * Math.exp(-t * 6);
+      phd += TAU * f / SR;
+      d[i] += Math.sin(phd) * Math.exp(-t * 16) * 0.4;
+    }
+    [{ f: 1245, at: 0 }, { f: 1660, at: 0.09 }].forEach(({ f, at }) => {
+      const a0 = Math.round(at * SR);
+      [1, 2.76, 5.4].forEach((mul, pi) => {
+        const g = [0.5, 0.25, 0.12][pi];
+        let ph = 0;
+        for (let i = 0; i < SR * 0.5; i++){
+          const t = i / SR; ph += TAU * f * mul / SR;
+          const j = a0 + i; if (j >= d.length) break;
+          d[j] += Math.sin(ph) * Math.exp(-t * (7 + pi * 4)) * g;
+        }
+      });
+    });
+    for (let c = 0; c < 9; c++){
+      const at = Math.round((0.12 + Math.random() * 0.42) * SR);
+      const f = 2200 + Math.random() * 3800;
+      let ph = 0;
+      for (let i = 0; i < SR * 0.18; i++){
+        const t = i / SR; ph += TAU * f / SR;
+        const j = at + i; if (j >= d.length) break;
+        d[j] += Math.sin(ph) * Math.exp(-t * 30) * 0.1;
+      }
+    }
+  } else if (name === 'crash'){
+    d = mk(1.1);
+    let ph = 0;
+    for (let i = 0; i < SR * 0.3; i++){
+      const t = i / SR, f = 500 * Math.pow(0.1, t / 0.3);
+      ph += TAU * f / SR;
+      const saw = 2 * ((ph / TAU) % 1) - 1;
+      d[i] += Math.tanh(saw * 3) * Math.exp(-t * 8) * 0.5 + rnd() * 0.25 * Math.exp(-t * 10);
+    }
+    [0, 0.05, 0.11, 0.19, 0.3].forEach((at0, k) => {
+      const at = Math.round(at0 * SR);
+      for (let p = 0; p < 6; p++){
+        const f = 1800 + Math.random() * 4200, dec = 14 + Math.random() * 22, g = 0.12 * (1 - k * 0.13);
+        let phg = 0;
+        for (let i = 0; i < SR * 0.35; i++){
+          const t = i / SR; phg += TAU * f / SR;
+          const j = at + i; if (j >= d.length) break;
+          d[j] += Math.sin(phg) * Math.exp(-t * dec) * g;
+        }
+      }
+      for (let i = 0; i < SR * 0.03; i++){
+        const j = at + i; if (j < d.length) d[j] += rnd() * Math.exp(-i / (SR * 0.008)) * 0.2;
+      }
+    });
+  } else if (name === 'voltage_loop'){
+    d = mk(2);   // все частоты дают целое число циклов за 2с → бесшовный луп
+    for (let i = 0; i < d.length; i++){
+      const t = i / SR;
+      const am  = 0.75 + 0.25 * Math.sin(TAU * 2 * t);
+      const am2 = 0.8  + 0.2  * Math.sin(TAU * 7 * t);
+      d[i] = (Math.sin(TAU * 55 * t) * 0.42 + Math.sin(TAU * 110 * t) * 0.2 + Math.sin(TAU * 165 * t) * 0.1) * am
+           + (Math.sin(TAU * 1650 * t) * 0.02 + Math.sin(TAU * 2210 * t) * 0.013) * am2;
+    }
+  }
+  for (let i = 0; i < d.length; i++) d[i] = Math.tanh(d[i] * 1.15) * 0.9;
+  return d;
+}
+function sndSynth(name){
+  const f32 = sndRender(name);
+  const b = SND.ctx.createBuffer(1, f32.length, SND_SR);
+  b.getChannelData(0).set(f32);
+  return b;
+}
+
+function sndInit(){                        // первый пользовательский жест
+  if (SND.ctx){ if (SND.ctx.state === 'suspended') SND.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  SND.ctx = new AC();
+  SND.master = SND.ctx.createGain();
+  SND.master.gain.value = SND.on ? SND.vol : 0;
+  SND.master.connect(SND.ctx.destination);
+  Promise.all(SND.names.map(async n => {
+    try {
+      const r = await fetch('sounds/' + n + '.wav');
+      if (!r.ok) throw 0;
+      SND.buf[n] = await SND.ctx.decodeAudioData(await r.arrayBuffer());
+      SND.src[n] = 'file';
+    } catch (e) {
+      SND.buf[n] = sndSynth(n);            // file:// или файла нет — синтез на лету
+      SND.src[n] = 'synth';
+    }
+  })).then(() => {
+    SND.ready = true;
+    if (SND.on && typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
+  });
+}
+['pointerdown','keydown','touchstart'].forEach(ev => addEventListener(ev, sndInit, { passive: true }));
+
+function sfx(n, g = 1, rate = 1){
+  if (!SND.on || !SND.ready || !SND.buf[n]) return;
+  try {
+    const s = SND.ctx.createBufferSource();
+    s.buffer = SND.buf[n]; s.playbackRate.value = rate;
+    const gn = SND.ctx.createGain(); gn.gain.value = g;
+    s.connect(gn); gn.connect(SND.master); s.start();
+  } catch (e) {}
+}
+/* гул напряжения: живёт весь раунд, высота растёт с множителем */
+function voltStart(){
+  if (!SND.on || !SND.ready || SND.volt.src || !SND.buf.voltage_loop) return;
+  const s = SND.ctx.createBufferSource();
+  s.buffer = SND.buf.voltage_loop; s.loop = true;
+  const gn = SND.ctx.createGain(); gn.gain.value = 0;
+  s.connect(gn); gn.connect(SND.master); s.start();
+  gn.gain.setTargetAtTime(0.5, SND.ctx.currentTime, 0.25);
+  SND.volt = { src: s, gain: gn };
+}
+function voltTune(m){
+  if (!SND.volt.src) return;
+  const r = Math.min(1.6, 1 + Math.log2(Math.max(1, m)) * 0.12);
+  SND.volt.src.playbackRate.setTargetAtTime(r, SND.ctx.currentTime, 0.3);
+}
+function voltStop(){
+  const v = SND.volt;
+  if (!v.src) return;
+  v.gain.gain.setTargetAtTime(0, SND.ctx.currentTime, 0.12);
+  const src = v.src;
+  setTimeout(() => { try { src.stop(); } catch (e) {} }, 700);
+  SND.volt = { src: null, gain: null };
+}
+/* панель настроек */
+function sndSetEnabled(on){
+  SND.on = on; sndSave();
+  if (on) sndInit();                        // клик по тумблеру = жест → можно стартовать аудио
+  if (SND.master) SND.master.gain.setTargetAtTime(on ? SND.vol : 0, SND.ctx.currentTime, 0.06);
+  if (!on) voltStop();
+  else if (typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
+}
+function sndSetVolume(v){
+  SND.vol = Math.min(1, Math.max(0, v / 100)); sndSave();
+  const el = $('sndVol'); if (el) el.style.setProperty('--vfill', Math.round(SND.vol * 100) + '%');
+  if (SND.master && SND.on) SND.master.gain.setTargetAtTime(SND.vol, SND.ctx.currentTime, 0.05);
+}
+/* окно настроек открывается прямо под кнопкой-динамиком (правый край окна = правому краю кнопки) */
+function sndPopPos(){
+  const btn = document.querySelector('.info-btn[for="sndToggle"]');
+  const pop = document.querySelector('.snd-pop');
+  if (!btn || !pop) return;
+  const b = btn.getBoundingClientRect(), w = pop.offsetWidth || 240;
+  let right = Math.max(8, window.innerWidth - b.right);
+  if (window.innerWidth - right - w < 8) right = Math.max(8, window.innerWidth - w - 8);
+  pop.style.top = (b.bottom + 8) + 'px';
+  pop.style.right = right + 'px';
+}
+addEventListener('resize', () => { if ($('sndToggle') && $('sndToggle').checked) sndPopPos(); });
+
+/* ═══════════════════════════════════════════════════════════════════
+   MUSIC — треки из ./Music/*.mp3. Выбор и громкость — в панели звука.
+   Выбранный трек играет по кругу (loop), пока игрок не сменит его или
+   не выключит (off). Выбор и громкость хранятся в localStorage('volta_mus').
+   Музыка независима от тумблера эффектов — у неё свой слайдер.
+   ═══════════════════════════════════════════════════════════════════ */
+const MUS = {
+  list: ['Lantern Drift 1','Lantern Drift 2','Volta Circuit 1','Volta Circuit 2',
+         'Volta Circuit 3','Voltage Loop 1','Voltage Loop 2'],
+  el: null, on: true, track: 'Lantern Drift 1', vol: 0.5, fade: null   // дефолт: музыка вкл, Lantern Drift 1
+};
+try {
+  const s = JSON.parse(localStorage.getItem('volta_mus') || '{}');
+  if (typeof s.on === 'boolean') MUS.on = s.on;
+  if (typeof s.track === 'string' && MUS.list.includes(s.track)) MUS.track = s.track;
+  if (typeof s.vol === 'number') MUS.vol = Math.min(1, Math.max(0, s.vol));
+} catch (e) {}
+function musSave(){ try { localStorage.setItem('volta_mus', JSON.stringify({ on: MUS.on, track: MUS.track, vol: MUS.vol })); } catch (e) {} }
+
+function musEl(){
+  if (!MUS.el){ MUS.el = new Audio(); MUS.el.loop = true; MUS.el.preload = 'auto'; }  // трек играет по кругу
+  return MUS.el;
+}
+function musFadeTo(target, then){       // мягкий кроссфейд без щелчков
+  clearInterval(MUS.fade);
+  const el = musEl(), step = 0.08;
+  MUS.fade = setInterval(() => {
+    const dv = target - el.volume;
+    if (Math.abs(dv) <= step){ el.volume = Math.max(0, Math.min(1, target)); clearInterval(MUS.fade); if (then) then(); }
+    else el.volume += Math.sign(dv) * step;
+  }, 40);
+}
+function musSrcIs(name){ try { return decodeURIComponent(musEl().src).indexOf('/Music/' + name + '.mp3') !== -1; } catch (e) { return false; } }
+function musApply(restart){             // приводит проигрыватель к текущему состоянию MUS
+  const el = musEl();
+  if (!MUS.on || !MUS.track){ musFadeTo(0, () => el.pause()); return; }
+  const need = restart || !musSrcIs(MUS.track);
+  const go = () => {
+    clearInterval(MUS.fade);          // убить любой висящий fade-out, чтобы он не поставил на паузу новый трек
+    if (need){ el.src = 'Music/' + MUS.track + '.mp3'; el.loop = true; el.volume = 0; }
+    el.play().then(() => musFadeTo(MUS.vol)).catch(() => {});   // до первого жеста браузер может молчать
+  };
+  if (need && !el.paused) musFadeTo(0, go); else go();
+}
+function musSetEnabled(on){             // тумблер музыки (как у эффектов)
+  MUS.on = on; musSave();
+  const pop = document.querySelector('.snd-pop'); if (pop) pop.classList.toggle('mus-off', !on);
+  musApply(false);
+}
+function musSelectTrack(name){          // выбор трека из выпадающего списка
+  if (!MUS.list.includes(name)) return;
+  MUS.track = name; musSave();
+  const sel = $('musSelect'); if (sel && sel.value !== name) sel.value = name;
+  musApply(true);                       // сменить трек — с кроссфейдом
+}
+function musSetVolume(v){
+  MUS.vol = Math.min(1, Math.max(0, v / 100)); musSave();
+  const el = $('musVol'); if (el) el.style.setProperty('--vfill', Math.round(MUS.vol * 100) + '%');
+  if (MUS.el && MUS.on && !MUS.el.paused){ clearInterval(MUS.fade); MUS.el.volume = MUS.vol; }
+}
+function musRenderSelect(){
+  const sel = $('musSelect'); if (!sel) return;
+  sel.innerHTML = MUS.list.map(n => `<option value="${n}">${n}</option>`).join('');
+  sel.value = MUS.track;
+}
+/* первый жест: снять autoplay-блокировку, если музыка включена */
+function musResume(){ if (MUS.on && MUS.track && (!MUS.el || MUS.el.paused)) musApply(false); }
+['pointerdown','keydown','touchstart'].forEach(ev => addEventListener(ev, musResume, { passive: true }));
+
+/* ── MULTIPLIER TIER → drives PCB traces, aura & lamp glow colour ──── */
+function tierClass(m){
+  if (m >= 70) return 'm-70x'; if (m >= 40) return 'm-40x';
+  if (m >= 20) return 'm-20x'; if (m >= 10) return 'm-10x';
+  if (m >= 5)  return 'm-5x';  if (m >= 2)  return 'm-2x';
+  return 'm-1x';
+}
+// same ramp as --m-color — shared by the global multiplier and the history chips
+function tierColor(m){
+  if (m >= 70) return '#ff2d4f'; if (m >= 40) return '#ff5a35';
+  if (m >= 20) return '#ff9152'; if (m >= 10) return '#ff5fb0';
+  if (m >= 5)  return '#a06bff'; if (m >= 2)  return '#5b8cff';
+  return '#2fe0e0';
+}
+function tintChip(el, m){
+  const col = tierColor(m);
+  el.style.color = col;
+  el.style.background = `color-mix(in srgb, ${col} 16%, transparent)`;
+}
+const ALL_TIERS = ['m-1x','m-2x','m-5x','m-10x','m-20x','m-40x','m-70x'];
+let tierSwapTimer = null;
+function setTier(m){
+  const c = tierClass(m);
+  if (c === G.tier) return;
+  G.tier = c;
+  // flash the vias first (in the current colour), THEN swap to the new tier colour
+  const card = document.querySelector('.lamp-card');
+  if (card){ card.classList.remove('lp-flash'); void card.offsetWidth; card.classList.add('lp-flash'); }
+  clearTimeout(tierSwapTimer);
+  tierSwapTimer = setTimeout(() => {
+    appEl.classList.remove(...ALL_TIERS);
+    appEl.classList.add(c);               // lamp/PCB/wire/battery all re-ramp via var(--m-color)
+    if (card) setTimeout(() => card.classList.remove('lp-flash'), 300);
+  }, 130);
+}
+
+/* ── STATE BADGE + STATUS LINE ────────────────────────────────────── */
+function setBadge(txt, color){
+  const b = $('stateBadge');
+  b.innerHTML = '● ' + txt;
+  b.style.color = color;
+  b.style.background = `color-mix(in srgb, ${color} 14%, transparent)`;
+  b.style.borderColor = `color-mix(in srgb, ${color} 34%, transparent)`;
+}
+function setStatus(txt, color){
+  const s = $('statusTxt');
+  s.textContent = txt;
+  if (color) s.style.color = color;
+}
+
+/* ── LAMP SVG (ON / OFF / CRASH) ──────────────────────────────────── */
+function animLamp(on, crashed){
+  // все состояния стекла/спирали/свечения — CSS-классы на .lamp-svg;
+  // JS оставляет себе только кольцо-шкалу, провод и классы контраста
+  const ring = $('lampRing'), ringAnim = $('ringAnim');
+  const card = document.querySelector('.lamp-card'),
+        svg  = document.querySelector('.lamp-svg');
+  const circ = 2 * Math.PI * 36; // ≈ 226
+
+  card.classList.toggle('lamp-lit', !!on && !crashed);
+  card.classList.toggle('crashed', !!crashed);
+  svg.classList.toggle('is-on', !!on && !crashed);
+  svg.classList.toggle('is-off', !on && !crashed);
+
+  if (crashed){
+    svg.classList.add('broken');               // толчок → верх колбы осколками (CSS)
+    sfx('crash', .9);                          // звон стекла + электро-зап
+    ring.style.stroke = 'var(--r)'; ring.style.strokeDasharray = `${circ} 0`;
+    ringAnim.style.opacity = '.15';
+    wireEl.className = 'wire-bridge w-crash';
+    return;
+  }
+  svg.classList.remove('broken');
+  if (!on){
+    ring.style.stroke = 'var(--brd2)'; ring.style.strokeDasharray = `0 ${circ}`;
+    ringAnim.style.opacity = '.12';
+    wireEl.className = 'wire-bridge w-off';   // dim wire when the lamp is OFF
+    return;
+  }
+  ring.style.stroke = 'var(--m-color)'; ring.style.strokeDasharray = `${circ} 0`;
+  ringAnim.style.opacity = '.62';
+  wireEl.className = 'wire-bridge w-on';       // bright wire when the lamp is ON
+}
+
+/* ── SWITCH COUNTER ───────────────────────────────────────────────── */
+function updSwitches(){
+  const dots = $('swRow').querySelectorAll('.sw');
+  dots.forEach((d, i) => { d.className = 'sw ' + (i < G.switchesLeft ? 'u' : 'a'); });
+}
+
+/* ── PERSONAL MULTIPLIER ──────────────────────────────────────────── */
+function currentGlobalMult(){
+  if (!G.startTime || G.phase !== 'IN_PROGRESS') return 1.0;
+  return growthFunc(Date.now() - G.startTime) / 100;
+}
+function currentPersonalMult(){
+  if (!G.lampOn) return G.persAccum;
+  const gain = G.persOnEntry > 0 ? currentGlobalMult() / G.persOnEntry : 1.0;
+  return G.persAccum * gain;
+}
+function updPersonal(){
+  const mp = currentPersonalMult();
+  const el = $('persVal');
+  el.textContent = mp.toFixed(2);
+  el.style.color = G.lampOn ? 'var(--gold)' : (G.lampEver ? 'var(--p)' : 'var(--gold)');
+
+  // денежный эквивалент — крупно в блоке личного множителя
+  const pay = $('persPay');
+  if (G.bet && G.lampEver){
+    pay.textContent = fmt(G.bet * mp, 2);
+    pay.className = 'pers-pay' + (G.lampOn ? ' risk' : '');
+  } else {
+    pay.textContent = '—'; pay.className = 'pers-pay idle';
+  }
+}
+let _multLen = 0;
+function showGlobalMult(v){
+  const el = $('multEl');
+  const txt = '×' + v.toFixed(2);
+  el.textContent = txt;
+  el.style.color = tierColor(v);     // colour matches the value's history-chip tier
+  if (txt.length !== _multLen){ _multLen = txt.length; fitMult(); }  // refit only when length changes
+}
+// keep the global multiplier inside its zone — shrink the font if the value is too wide
+function fitMult(){
+  const el = $('multEl'), block = el.parentElement;
+  el.style.fontSize = '';                                   // back to the CSS base size
+  const avail = block.clientWidth - 14;                     // minus padding
+  if (avail > 0 && el.scrollWidth > avail){
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = Math.max(12, base * avail / el.scrollWidth).toFixed(1) + 'px';
+  }
+}
+addEventListener('resize', () => { _multLen = 0; });        // re-evaluate fit after layout changes
+function updBal(){ $('balV').innerHTML = fmt(G.bal, 0); }
+
+/* ── ПРОВОД → ЛАМПА: точка спуска всегда напротив центра лампы,
+      в какой бы колонке/раскладке лампа ни находилась ── */
+let _wireX = -1;
+function alignWire(){
+  const lamp = document.querySelector('.lamp-outer');
+  if (!lamp || !wireEl) return;
+  const w = wireEl.getBoundingClientRect(), l = lamp.getBoundingClientRect();
+  if (!w.width || !l.width) return;
+  const batHalf = (document.querySelector('.bat-block')?.getBoundingClientRect().width || 112) / 2;
+  const x = Math.max(batHalf + 14, Math.min(w.width - 8, l.left + l.width / 2 - w.left));
+  if (Math.abs(x - _wireX) < .5) return;      // без лишней записи стилей
+  _wireX = x;
+  wireEl.style.setProperty('--wire-x', x.toFixed(1) + 'px');
+}
+addEventListener('resize', alignWire);
+addEventListener('load', alignWire);
+if (window.ResizeObserver){           // ловит сдвиги лампы без resize окна (шторки, смена контента)
+  const lo = document.querySelector('.lamp-outer');
+  if (lo) new ResizeObserver(alignWire).observe(lo);
+}
+
+/* ── ACCUMULATOR — empty at 1.00, charges as power builds, shimmers faster ──
+   the 5 segments are static markup (never added/removed), so query them once
+   instead of re-querying the DOM on every 50ms display tick ── */
+const _batSegs = [...document.querySelectorAll('.bat-seg')];
+function chargeBattery(mult){
+  // 0 bars at ×1.00 → 5 bars by ~×32 (log2 scale)
+  const level = mult <= 1 ? 0 : Math.min(5, Math.round(Math.log2(mult)) + 1);
+  _batSegs.forEach((s, i) => s.classList.toggle('on', i < level));
+  // shimmer cadence quickens with the multiplier (1.7s → 0.45s)
+  const spd = Math.max(0.45, 1.7 - Math.log(mult) * 0.42).toFixed(2);
+  const svg = $('batSvg'); if (svg) svg.style.setProperty('--bat-speed', spd + 's');
+}
+
+/* ── МОЛНИЯ между разъёмами: 8 форм разряда, поочерёдно;
+      смена ускоряется с ростом общего множителя (~600мс → 100мс) ── */
+const _bolts = [...document.querySelectorAll('.volt-zone .bolt')];
+let _boltIdx = 0, _boltNext = 0;
+function boltTick(mult){
+  if (!_bolts.length) return;
+  const now = performance.now();
+  if (now < _boltNext) return;
+  const interval = Math.max(100, 600 / (1 + (mult - 1) * 0.55));
+  _boltNext = now + interval;
+  _bolts[_boltIdx].classList.remove('on');
+  _boltIdx = (_boltIdx + 1) % _bolts.length;
+  _bolts[_boltIdx].classList.add('on');
+}
+
+/* ── START TIMER (under the lamp) — counts down to the next round ────────── */
+function setTimer(durMs, label, state = 'count'){
+  G.timer = { end: Date.now() + durMs, dur: durMs, label, state };
+}
+function tickTimerUI(){
+  const t = G.timer, box = $('startTimer');
+  if (!box) return;
+  box.dataset.state = t.state;
+  if (t.state === 'live'){
+    $('stLbl').textContent = 'round live'; $('stSec').textContent = '●';
+    $('stFill').style.width = '100%'; return;
+  }
+  const rem = Math.max(0, t.end - Date.now());
+  $('stLbl').textContent = t.label;
+  $('stSec').textContent = Math.max(1, Math.ceil(rem / 1000));
+  $('stFill').style.width = (t.dur ? (rem / t.dur * 100) : 0).toFixed(1) + '%';
+}
+setInterval(() => { tickTimerUI(); alignWire(); }, 100);   // тикер заодно держит провод напротив лампы
+
+/* ── WIN POPUP — shows the player their earnings after a winning round ── */
+let winPopTimer = null;
+function showWinPop(payout, mult, profit){
+  $('winPopAmt').innerHTML = fmt(payout, 2);
+  $('winPopSub').innerHTML = `multiplier ×${mult.toFixed(2)} · profit <b>+${fmt(profit, 2)}</b>`;
+  const p = $('winPop');
+  p.hidden = false;
+  requestAnimationFrame(() => p.classList.add('show'));
+  clearTimeout(winPopTimer); winPopTimer = setTimeout(hideWinPop, 5000);
+}
+function hideWinPop(){
+  const p = $('winPop');
+  if (!p || p.hidden) return;
+  p.classList.remove('show'); clearTimeout(winPopTimer);
+  setTimeout(() => { p.hidden = true; }, 360);
+}
+
+/* ── ROUND HISTORY BAR (global crash points, tinted by magnitude) ─── */
+function addHistCrash(m){
+  const bar = document.querySelector('.hist-bar');
+  const lbl = bar.querySelector('.hist-lbl');
+  const chip = document.createElement('span');
+  chip.className = 'hc';
+  chip.textContent = '×' + m.toFixed(2);
+  tintChip(chip, m);                 // colour by the same tier ramp as the global multiplier
+  lbl.after(chip);
+  const chips = bar.querySelectorAll('.hc');
+  for (let i = chips.length - 1; i >= 14; i--) chips[i].remove();
+}
+
+/* ── SCREEN FLASH ─────────────────────────────────────────────────── */
+function flash(color = 'rgba(255,77,109,.14)'){
+  const d = document.createElement('div');
+  d.className = 'flash'; d.style.background = color;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 650);
+}
+
+/* ── DISPLAY LOOP (50ms interpolation) ────────────────────────────── */
+function startDisplayLoop(){
+  stopDisplayLoop();
+  G.displayTimer = setInterval(() => {
+    if (G.phase !== 'IN_PROGRESS') return;
+    const gMult = growthFunc(Date.now() - G.startTime) / 100;
+    processAuto(gMult);
+    botTick(gMult);
+    boltTick(gMult);
+    voltTune(gMult);
+    setTier(gMult);
+    chargeBattery(gMult);
+    showGlobalMult(gMult);
+    updPersonal();
+    setStatus(`live · ×${gMult.toFixed(2)}`, 'var(--m-color)');
+    if ((++liveRenderTick % 7) === 0) renderLive(gMult);   // ~350ms cadence
+  }, DISPLAY_TICK);
+}
+function stopDisplayLoop(){ if (G.displayTimer){ clearInterval(G.displayTimer); G.displayTimer = null; } }
+
+/* ── CRASH SCHEDULING ─────────────────────────────────────────────── */
+function scheduleCrash(){
+  const remaining = G.gameDuration - (Date.now() - G.startTime);
+  clearTimeout(G.tickTimer);
+  G.tickTimer = setTimeout(() => {
+    const actualMult = growthFunc(Date.now() - G.startTime) / 100;
+    handleCrash(actualMult);
+  }, Math.max(0, remaining));
+}
+
+function handleCrash(){
+  stopDisplayLoop();
+  voltStop();                        // гул напряжения обрывается на краше
+  clearTimeout(G.tickTimer);
+  G.phase = 'ENDED'; G.rounds = (G.rounds || 0) + 1;
+
+  const cp = G.crashPoint;
+  const crashMult = cp === 0 ? 1.0 : cp / 100;
+
+  setTier(crashMult);
+  chargeBattery(crashMult);
+  showGlobalMult(crashMult);
+  $('multEl').classList.add('is-crash');
+  voltEl.classList.remove('live');        // voltage stops when the round ends
+  voltEl.classList.add('crash-shake');
+  setTimeout(() => voltEl.classList.remove('crash-shake'), 360);
+  addHistCrash(crashMult);
+  setTimer(AFTER_CRASH_MS, 'new round', 'crash');
+  resolveBots(crashMult);            // settle the whole table at the crash point
+  renderLive(crashMult);
+
+  const neverOn   = !G.lampEver;
+  const lampWasOn = G.lampOn;
+
+  let finalPers;
+  if (lampWasOn){
+    const gain = G.persOnEntry > 0 ? crashMult / G.persOnEntry : 1.0;
+    finalPers = G.persAccum * gain;
+  } else finalPers = G.persAccum;
+
+  flash();
+  animLamp(false, true);
+
+  let playerPayout = 0;
+  if (!G.bet){
+    setBadge(`crash ×${crashMult.toFixed(2)}`, 'var(--r)');
+    setStatus(`crash ×${crashMult.toFixed(2)}`, 'var(--r)');
+  } else if (neverOn || lampWasOn){
+    setBadge(lampWasOn ? 'bet lost' : 'never on', 'var(--r)');
+    setStatus(`crash ×${crashMult.toFixed(2)} — lost`, 'var(--r)');
+    flash('rgba(255,77,109,.2)');
+  } else {
+    playerPayout = G.bet * finalPers;
+    G.bal += playerPayout;
+    setBadge(`payout ×${finalPers.toFixed(2)}`, 'var(--g)');
+    setStatus(`payout ${fmt(playerPayout, 2)}`, 'var(--g)');
+    flash('rgba(51,225,237,.12)');
+    updBal();
+    setTimeout(() => sfx('cashout', .9), 300);   // «касса» после звона стекла
+    showWinPop(playerPayout, finalPers, playerPayout - G.bet);   // popup with the player's earnings
+  }
+  showRoundWinnings(playerPayout);   // total table winnings for the round
+
+  updPersonal();
+  disableLampButtons();
+  $('betBtn').disabled = true;
+
+  setTimeout(() => prepRound(), AFTER_CRASH_MS);
+}
+
+/* ── PREP ROUND ───────────────────────────────────────────────────── */
+function prepRound(){
+  G.round++;
+  G.phase = 'STARTING';
+  voltStop();                        // страховка: гул точно молчит между раундами
+
+  G.serverSeed   = randHex(32);
+  G.hash         = sha256hex(G.serverSeed);
+  G.crashPoint   = crashPointFromHash(G.serverSeed);
+  G.gameDuration = G.crashPoint === 0 ? 0 : Math.ceil(inverseGrowth(G.crashPoint + 1));
+
+  G.bet = null; G.lampOn = false; G.lampEver = false;
+  G.switchesLeft = MAX_SWITCHES; G.switchesUsed = 0;
+  G.persAccum = 1.0; G.persOnEntry = 1.0;
+
+  setTier(1.0);
+  chargeBattery(1.0);                 // accumulator starts empty each round
+  voltEl.classList.remove('live');    // voltage off while waiting for the round
+  setTimer(RESTART_MS, 'starts in');
+  $('multEl').classList.remove('is-crash');
+  showGlobalMult(1.0);
+  updSwitches();
+  animLamp(false, false);
+  updPersonal();
+  setBadge('bets', 'var(--b)');
+
+  const bb = $('betBtn');
+  bb.disabled = false; bb.classList.remove('placed'); bb.textContent = 'BET';
+  $('betNote').innerHTML = `seed: <b style="color:var(--p)">${G.hash.slice(0, 10)}…</b> · bets open`;
+  disableLampButtons();
+
+  spawnBots();                       // a fresh table of players each round
+  renderPre();
+  hideRoundWinnings();
+  hideWinPop();
+  setLbPhase(false);                 // leaderboard shows "До старта"
+
+  addLog(`round #${G.round} open, hash ${G.hash.slice(0, 12)}`);
+
+  let cd = Math.ceil(RESTART_MS / 1000);
+  setStatus(`starts in ${cd}s`, 'var(--b)');
+  const countdown = setInterval(() => {
+    cd--;
+    if (cd > 0) setStatus(`starts in ${cd}s`, 'var(--b)');   // тик таймера убран по просьбе
+    else { clearInterval(countdown); startRound(); }
+  }, 1000);
+}
+
+function startRound(){
+  G.phase = 'IN_PROGRESS';
+  G.startTime = Date.now();
+  G.timer.state = 'live';            // timer under the lamp shows "раунд идёт"
+  voltEl.classList.add('live');      // voltage scale starts flowing
+  sfx('round_start', .8);            // power-up на старте
+  voltStart();                       // гул напряжения на весь раунд
+  snapshotAuto();
+  setLbPhase(true);                  // leaderboard auto-switches to "В игре"
+  hideRoundWinnings();
+  renderLive(1.0);
+
+  $('betBtn').disabled = true;
+  addLog(`#${G.round} start, crash @ ×${G.crashPoint === 0 ? '1.00' : (G.crashPoint / 100).toFixed(2)}`);
+
+  if (G.bet){
+    // free starting ON — does not consume a switch
+    G.lampOn = true; G.lampEver = true;
+    G.persOnEntry = 1.0; G.persAccum = 1.0;
+    animLamp(true, false);
+    enableLampButtons();
+    setBadge('ON', 'var(--gold)');
+    if (G.auto.on && G.auto.actions.length){
+      addLog('autopilot: ' + G.auto.actions.map(a => `${a.type === 'off' ? 'OFF' : 'ON'}@${a.m}`).join(' '));
+    }
+  } else {
+    setBadge('watching', 'var(--t2)');
+    setStatus('round live · no bet', 'var(--t3)');
+  }
+
+  startDisplayLoop();
+  scheduleCrash();
+}
+
+/* ── LAMP CONTROLS ────────────────────────────────────────────────── */
+function lampOn(){
+  if (G.phase !== 'IN_PROGRESS' || G.switchesLeft <= 0 || G.lampOn || !G.bet) return;
+  G.lampOn = true; G.lampEver = true;
+  G.switchesLeft--; G.switchesUsed++;
+  G.persOnEntry = currentGlobalMult();
+  animLamp(true, false);
+  sfx('lamp_on', .8);
+  updSwitches();
+  setBadge('ON', 'var(--gold)');
+  syncLampButtons();
+  updPersonal();
+}
+function lampOff(){
+  if (G.phase !== 'IN_PROGRESS' || !G.lampOn) return;
+  const nowG = currentGlobalMult();
+  const gain = G.persOnEntry > 0 ? nowG / G.persOnEntry : 1.0;
+  G.persAccum *= gain;
+  G.lampOn = false; G.persOnEntry = nowG;
+  animLamp(false, false);
+  sfx('lamp_off', .8);
+  setBadge(`OFF · ×${G.persAccum.toFixed(2)} locked`, 'var(--p)');
+  syncLampButtons();
+  updPersonal();
+}
+/* exactly one button is ever active: OFF when the lamp is ON, ON when it's OFF
+   (and switches remain) — so only the available action is lit. */
+function syncLampButtons(){
+  const live = G.phase === 'IN_PROGRESS' && !!G.bet;
+  $('btnOn').disabled  = !(live && !G.lampOn && G.switchesLeft > 0);
+  $('btnOff').disabled = !(live && G.lampOn);
+}
+function enableLampButtons(){ syncLampButtons(); }
+function disableLampButtons(){ $('btnOn').disabled = true; $('btnOff').disabled = true; }
+
+/* ── AUTOPILOT ────────────────────────────────────────────────────── */
+function onAutoMasterToggle(){
+  const on = $('autoEnable').checked;
+  document.querySelector('.tog-lbl').textContent = on ? 'on' : 'off';
+  if (on && G.phase === 'IN_PROGRESS' && G.bet){
+    G.auto.on = true; G.auto.actions = buildAutoActions();
+  }
+  renderAutoStatus();
+}
+function buildAutoActions(){
+  const acts = [];
+  for (let n = 1; n <= 4; n++){
+    if (!$('autoStageEn' + n).checked) continue;
+    const off = parseFloat($('autoOff' + n).value);
+    const onV = parseFloat($('autoOn' + n).value);
+    if (off && off > 1) acts.push({ type: 'off', m: off, stage: n, fired: false });
+    if (onV && onV > 1) acts.push({ type: 'on',  m: onV, stage: n, fired: false });
+  }
+  if ($('autoFinalEn').checked){
+    const fOff = parseFloat($('autoFinalOff').value);
+    if (fOff && fOff > 1) acts.push({ type: 'off', m: fOff, stage: 'final', fired: false });
+  }
+  acts.sort((a, b) => a.m - b.m);
+  return acts;
+}
+function snapshotAuto(){
+  G.auto.on = $('autoEnable').checked;
+  G.auto.actions = G.auto.on ? buildAutoActions() : [];
+}
+function processAuto(curMult){
+  if (!G.auto.on || G.phase !== 'IN_PROGRESS' || !G.bet) return;
+  for (const a of G.auto.actions){
+    if (a.fired) continue;
+    if (curMult + 1e-9 >= a.m){
+      a.fired = true;
+      if (a.type === 'off'){ if (G.lampOn) lampOff(); }
+      else { if (!G.lampOn && G.switchesLeft > 0) lampOn(); }
+    } else break;
+  }
+}
+function renderAutoStatus(){
+  const el = $('autoStatus');
+  if (!$('autoEnable').checked){
+    el.hidden = true; el.innerHTML = '';   // подпись-заглушка убрана: блок виден только с планом
+    return;
+  }
+  el.hidden = false;
+  const acts = buildAutoActions();
+  if (!acts.length){
+    el.innerHTML = '⚠️ On, but no active stages with a valid ×.';
+    return;
+  }
+  const seq = acts.map(a => a.type === 'off'
+    ? `<b class="off">${a.stage === 'final' ? '🔒OFF' : 'OFF'}·×${a.m.toFixed(2)}</b>`
+    : `<b class="on">ON·×${a.m.toFixed(2)}</b>`).join(' → ');
+  const ons = acts.filter(a => a.type === 'on').length;
+  const warn = ons > MAX_SWITCHES
+    ? `<br>⚠️ plan has ${ons} ON > limit of ${MAX_SWITCHES}.` : '';
+  const live = G.phase === 'IN_PROGRESS' ? '' : '<br>Applies from the start of the next round.';
+  el.innerHTML = `Start ON → ${seq}${warn}${live}`;
+}
+
+/* ── BET ──────────────────────────────────────────────────────────── */
+function placeBet(){
+  if (G.bet) return;
+  if (G.phase !== 'STARTING'){
+    // betting window (RESTART_MS) already closed for this round — say so instead
+    // of silently doing nothing, which otherwise looks like the whole game is dead
+    $('betNote').innerHTML = 'bets closed — <b style="color:var(--gold)">wait for the next round</b>';
+    return;
+  }
+  const a = parseFloat($('betAmt').value);
+  if (!a || a < 1){ $('betNote').textContent = 'minimum $1'; return; }
+  if (a > MAX_BET){ $('betAmt').value = MAX_BET; $('betNote').textContent = 'maximum $' + MAX_BET; return; }
+  if (a > G.bal){ $('betNote').textContent = 'insufficient balance'; return; }
+  G.bal -= a; G.bet = a;
+  updBal();
+  sfx('bet', .7);
+  const bb = $('betBtn');
+  bb.disabled = true; bb.classList.add('placed'); bb.textContent = '✓ bet accepted';
+  $('betNote').innerHTML = `in play <b style="color:var(--gold)">${fmt(a, 0)}</b> · lamp turns on at start`;
+  renderPre();                       // player joins the shared table
+}
+function qb(f){ const e = $('betAmt'); e.value = Math.min(MAX_BET, Math.max(1, Math.floor((parseFloat(e.value) || 1) * f))); }
+function qbf(v){ $('betAmt').value = Math.min(MAX_BET, v); }
+
+/* ── MULTIPLAYER SIMULATION ───────────────────────────────────────────
+   Every round is shared. We simulate a table of other players (bots) who
+   bet, ride the same global multiplier with their own lamp, and lock their
+   personal × at their own targets — exactly the player's mechanic. Drives
+   the live leaderboard so the "общий раунд" of the concept is visible. */
+const BOT_NAMES = ['big_bet','winner2','volta_fan','gold_rush','flash77','night_x','fast_win',
+  'dark99','player5','m_player','user_abc','newbie1','risk_it','careful','alex_k','spark_z',
+  'ohm_boy','tesla88','ampere','joule_x','neon_kat','volt_lord','zap_99','circuit'];
+const BET_TIERS = [50,100,150,200,300,500,750,1000,1500,2000];
+let bots = [];
+let liveRenderTick = 0;
+
+function spawnBots(){
+  const n = 11 + Math.floor(Math.random() * 7);            // 11–17 players
+  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, n);
+  bots = names.map(name => {
+    const bet = BET_TIERS[Math.floor(Math.random() * BET_TIERS.length)];
+    const r = Math.random();
+    const off = +(1.15 + r * r * r * 9).toFixed(2);         // cubic skew → mostly early cashouts
+    const reOn  = Math.random() < 0.32 ? +(off + 0.3 + Math.random() * 2).toFixed(2) : null;
+    const reOff = reOn ? +(reOn + 0.5 + Math.random() * Math.random() * 8).toFixed(2) : null;
+    return { name, bet, off, reOn, reOff, lampOn: true, persAccum: 1, persOnEntry: 1,
+             switches: MAX_SWITCHES, lockedOnce: false, didReOn: false, settled: false, win: null };
+  });
+}
+function botLockOff(b, m){ b.persAccum *= m / b.persOnEntry; b.lampOn = false; b.persOnEntry = m; }
+function botPers(b, m){
+  if (b.settled) return b.finalMult;                 // frozen once the round ends
+  return b.lampOn ? b.persAccum * (m / b.persOnEntry) : b.persAccum;
+}
+function botTick(curMult){
+  for (const b of bots){
+    if (b.settled) continue;
+    if (b.lampOn){
+      if (!b.lockedOnce && curMult >= b.off){ botLockOff(b, curMult); b.lockedOnce = true; }
+      else if (b.didReOn && b.reOff && curMult >= b.reOff){ botLockOff(b, curMult); }
+    } else if (b.lockedOnce && !b.didReOn && b.reOn && b.switches > 0 && curMult >= b.reOn){
+      b.persOnEntry = curMult; b.lampOn = true; b.didReOn = true; b.switches--;
+    }
+  }
+}
+function resolveBots(crashMult){
+  for (const b of bots){
+    b.finalMult = botPers(b, crashMult); // compute live value BEFORE freezing
+    b.win = !b.lampOn;                    // OFF at crash → win, ON → lost
+    b.settled = true;                     // botPers now returns finalMult (no double-count)
+  }
+}
+const initial = s => (s[0] || '?').toUpperCase();
+function multColor(m){ return m >= 8 ? 'var(--gold)' : m >= 3 ? 'var(--p)' : 'var(--t2)'; }
+
+function renderPre(){
+  const rows = bots.map(b => ({ name: b.name, bet: b.bet, you: false }));
+  if (G.bet) rows.push({ name: 'you', bet: G.bet, you: true });
+  rows.sort((a, b) => b.bet - a.bet);
+  const total = rows.reduce((s, r) => s + r.bet, 0);
+  $('lbPlayers').textContent = rows.length;
+  $('lbBets').innerHTML = fmt(total, 0);
+  $('lbPreList').innerHTML = rows.map((r, i) => `
+    <div class="lb-row"${r.you ? ' style="background:var(--p3)"' : ''}>
+      <div class="lb-left"><span class="lb-rank">${i + 1}</span>
+        <div class="lb-ava">${initial(r.name)}</div>
+        <span class="lb-name"${r.you ? ' style="color:var(--gold);font-weight:700"' : ''}>${r.name}</span></div>
+      <div class="lb-right"><span class="lb-mult" style="color:${r.you ? 'var(--gold)' : 'var(--t2)'}">${fmt(r.bet, 0)}</span></div>
+    </div>`).join('');
+}
+
+function renderLive(curMult){
+  const ent = bots.map(b => ({ name: b.name, bet: b.bet, mult: botPers(b, curMult),
+                               on: b.lampOn, you: false, settled: b.settled, win: b.win }));
+  if (G.bet) ent.push({ name: 'you', bet: G.bet, mult: currentPersonalMult(),
+                        on: G.lampOn, you: true, settled: G.phase === 'ENDED' });
+  ent.sort((a, b) => b.mult - a.mult);
+  const onN = ent.filter(e => e.on).length, offN = ent.length - onN;
+  const onPct = ent.length ? Math.round(onN / ent.length * 100) : 0;
+  $('onoffFill').style.width = onPct + '%';
+  $('onoffPct').textContent  = onPct + '%';        // ON share of the table, beside the bar
+  $('onoffOn').innerHTML  = `&#9679; ON — ${onN}`;
+  $('onoffOff').innerHTML = `&#9679; OFF — ${offN}`;
+  $('lbLiveList').innerHTML = ent.map((e, i) => {
+    const badge = e.on ? '<span class="on-badge">ON</span>' : '<span class="off-badge">OFF</span>';
+    return `<div class="lb-row"${e.you ? ' style="background:var(--p3)"' : ''}>
+      <div class="lb-left"><span class="lb-rank">${i + 1}</span>
+        <div class="lb-ava">${initial(e.name)}</div>
+        <span class="lb-name"${e.you ? ' style="color:var(--gold);font-weight:700"' : ''}>${e.name}</span></div>
+      <div class="lb-right"><span class="lb-mult" style="color:#fff">×${e.mult.toFixed(2)}</span>
+        <div style="display:flex;align-items:center;gap:4px"><span class="lb-meta">$${e.bet}</span>${badge}</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* total table winnings (everyone OFF at crash) — shown when the round ends */
+function showRoundWinnings(playerPayout){
+  const botsWin = bots.reduce((s, b) => s + (b.win ? b.bet * b.finalMult : 0), 0);
+  const total = botsWin + (playerPayout || 0);
+  const el = $('lbRoundWin');
+  el.innerHTML = `Total round win: <b>${fmt(total, 2)}</b>`;
+  el.hidden = false;
+}
+function hideRoundWinnings(){ $('lbRoundWin').hidden = true; }
+
+/* single leaderboard: header + which panel shows, both driven by the phase */
+function setLbPhase(live){
+  $('lbPhaseTitle').textContent = live ? 'Live' : 'Pre-round';
+  document.querySelector('.lb-title').classList.toggle('lb-live', live);
+  $(live ? 'phLive' : 'phPre').checked = true;
+}
+
+/* ── BOOT ─────────────────────────────────────────────────────────── */
+try {
+  G.bal = 10000;
+  updBal();
+  renderAutoStatus();
+  // recolour the seeded history chips to the shared tier ramp
+  document.querySelectorAll('.hist-bar .hc').forEach(c => {
+    const m = parseFloat(c.textContent.replace(/[×x]/i, ''));
+    if (!isNaN(m)){ c.className = 'hc'; tintChip(c, m); }
+  });
+  addLog('VOLTA — Bustabit math (RTP ~96-97%), two-phase ramp + free start ON');
+  // панель звука: восстановленные настройки → контролы
+  $('sndEnable').checked = SND.on;
+  $('sndVol').value = Math.round(SND.vol * 100);
+  $('sndVol').style.setProperty('--vfill', Math.round(SND.vol * 100) + '%');
+  $('musEnable').checked = MUS.on;
+  $('musVol').value = Math.round(MUS.vol * 100);
+  $('musVol').style.setProperty('--vfill', Math.round(MUS.vol * 100) + '%');
+  document.querySelector('.snd-pop').classList.toggle('mus-off', !MUS.on);
+  musRenderSelect();
+  prepRound();
+  alignWire();
+  setTimeout(alignWire, 400);   // повторно после загрузки шрифтов/первого лэйаута
+} catch (err) {
+  // surface any startup failure instead of leaving a dead-looking UI — an alert
+  // guarantees it's seen even if the small on-page note is missed/out of view
+  console.error('VOLTA boot failed:', err);
+  const note = $('betNote');
+  if (note) note.innerHTML = `<b style="color:var(--r)">startup error:</b> ${err.message}`;
+  const st = $('statusTxt');
+  if (st) { st.textContent = 'error'; st.style.color = 'var(--r)'; }
+  alert('VOLTA failed to start: ' + err.message);
+}
+</script>
+
+</body>
+</html>

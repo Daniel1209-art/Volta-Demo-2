@@ -969,8 +969,10 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .game-zone{flex:1;min-height:0;gap:clamp(4px,.9vh,9px)}
   .volt-zone,.wire-bridge,.start-timer{flex:0 0 auto}
   /* lamp + personal-× fill the lamp card and never spill onto the controls:
-     the lamp takes the flexible row (shrinks on short screens, capped by --lamp),
-     the info column sits in the auto row below it */
+     the lamp takes the flexible row, the info column sits in the auto row below.
+     Столбиком лампа+инфо помещаются только на высоких экранах — при высоте
+     ≤760px включается ветка ниже (инфо-колонка вбок от лампы), поэтому здесь
+     сжатие min-height:0 безопасно: дефицита места в этой ветке не бывает */
   .lamp-card{flex:1;min-height:0;display:grid;grid-template-rows:minmax(110px,1fr) auto;
     justify-items:center;align-content:stretch;padding:8px 12px;gap:clamp(3px,.8vh,7px)}
   .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:var(--lamp)}
@@ -998,6 +1000,30 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 /* (fix) the old ≤700px-only scroll fallback is gone: .main-content above now
    scrolls on EVERY portrait phone whenever the column is taller than the
    visible (svh) viewport — tall phones with the address bar shown included */
+
+/* ── SHORT PORTRAIT PHONES (≤760px высоты: 360×640, 375×667, 360×740 с адресной
+      строкой): столбиком лампа+инфо не помещаются — инфо-колонка (статус ·
+      переключения · личный ×) уезжает ВБОК от лампы. Лампа при этом занимает
+      всю высоту карточки (даже крупнее, чем в столбике), ничего не наезжает
+      друг на друга и весь стол виден без скролла ── */
+@media(max-width:767px) and (max-height:760px){
+  .hist-bar{padding:4px 10px}
+  .main-content{gap:clamp(4px,.8vh,8px)}
+  /* высота лампы здесь ЯВНАЯ (см. ниже), поэтому min-content честный: на
+     сверхнизких экранах (≤ ~570px) колонка скроллится, а не наезжает */
+  .game-zone{gap:4px;min-height:min-content}
+  .lamp-card{min-height:min-content;grid-template-columns:minmax(0,1fr) minmax(120px,auto);
+    grid-template-rows:minmax(0,1fr);align-items:center;column-gap:10px;padding:8px 10px}
+  /* высота лампы задана ЯВНО от видимого (svh) вьюпорта: 100svh минус ~500px
+     постоянной обвязки (шапка+история+вольтаж+таймер+ON/OFF+ставка+зазоры).
+     Явный размер (а не height:100% + aspect-ratio) держит min-content колонки
+     честным — иначе грид раздувается и кнопка BET уезжает за экран */
+  .lamp-outer{grid-column:1;grid-row:1;width:auto;
+    height:clamp(110px,calc(100svh - 510px),var(--lamp));aspect-ratio:1;
+    max-width:100%;justify-self:center}
+  .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;gap:4px}
+  .start-timer{padding:4px 12px;gap:2px}
+}
 
 /* ── TWO-COLUMN — tablets (≥768) and any landscape below desktop: lamp left,
       controls right, fit-to-viewport. Also covers portrait tablets/2-in-1s at
@@ -1987,8 +2013,15 @@ function sndSynth(name){
   return b;
 }
 
-function sndInit(){                        // первый пользовательский жест
-  if (SND.ctx){ if (SND.ctx.state === 'suspended') SND.ctx.resume(); return; }
+function sndInit(){                        // вызывается при загрузке и на каждом жесте
+  if (SND.ctx){
+    if (SND.ctx.state === 'suspended') SND.ctx.resume().then(() => {
+      // контекст ожил (первый жест после заблокированного автозапуска) —
+      // если раунд уже идёт, догоняем гул напряжения
+      if (SND.on && SND.ready && typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
+    }).catch(() => {});
+    return;
+  }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   SND.ctx = new AC();
@@ -2013,7 +2046,9 @@ function sndInit(){                        // первый пользовате�
 ['pointerdown','keydown','touchstart'].forEach(ev => addEventListener(ev, sndInit, { passive: true }));
 
 function sfx(n, g = 1, rate = 1){
-  if (!SND.on || !SND.ready || !SND.buf[n]) return;
+  /* state !== running: контекст создан при загрузке, но autoplay ещё заблокирован —
+     не копим отложенные эффекты, иначе на первом жесте они выстрелят залпом */
+  if (!SND.on || !SND.ready || !SND.buf[n] || SND.ctx.state !== 'running') return;
   try {
     const s = SND.ctx.createBufferSource();
     s.buffer = SND.buf[n]; s.playbackRate.value = rate;
@@ -2023,7 +2058,8 @@ function sfx(n, g = 1, rate = 1){
 }
 /* гул напряжения: живёт весь раунд, высота растёт с множителем */
 function voltStart(){
-  if (!SND.on || !SND.ready || SND.volt.src || !SND.buf.voltage_loop) return;
+  if (!SND.on || !SND.ready || SND.volt.src || !SND.buf.voltage_loop ||
+      SND.ctx.state !== 'running') return;
   const s = SND.ctx.createBufferSource();
   s.buffer = SND.buf.voltage_loop; s.loop = true;
   const gn = SND.ctx.createGain(); gn.gain.value = 0;
@@ -3017,6 +3053,13 @@ try {
   $('musVol').style.setProperty('--vfill', Math.round(MUS.vol * 100) + '%');
   document.querySelector('.snd-pop').classList.toggle('mus-off', !MUS.on);
   musRenderSelect();
+  /* аудио: пробуем стартовать сразу при загрузке. Где браузер разрешает
+     autoplay (например, Chrome при высоком media engagement у сайта) — музыка
+     и эффекты заиграют без единого клика; где запрещает — молча ждём первый
+     жест (слушатели pointerdown/keydown/touchstart уже стоят). Буферы эффектов
+     в любом случае преддекодируются заранее — к первому жесту звук готов сразу */
+  sndInit();
+  musResume();
   /* раунды ведёт сервер: ждём hello/starting по WebSocket. До подключения
      кнопки погашены, чтобы нельзя было ставить в несуществующий раунд */
   disableLampButtons();

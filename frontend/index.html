@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VOLTA — Lamp Game · 3D</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -924,7 +924,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
     transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,0,1);
     box-shadow:0 -12px 44px rgba(0,0,0,.6);
     padding:10px clamp(12px,4vw,18px) calc(16px + env(safe-area-inset-bottom,0px))}
-  .auto-card .auto-head{padding-right:34px}
+  .auto-card .auto-head{padding-right:46px}
   #autoToggle:checked ~ .app .auto-card{transform:translateY(0)}
   .auto-backdrop{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 74%,transparent);
     z-index:1090;opacity:0;pointer-events:none;transition:opacity .3s;cursor:pointer}
@@ -1189,7 +1189,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 .prof-nick{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--gold);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .prof-hint{font-size:8px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
-@media(max-width:719px){.prof-btn{padding-right:46px}}   /* не под кнопкой × в шторке */
+@media(max-width:719px){.prof-btn{padding-right:58px}}   /* не под кнопкой × в шторке */
 /* отдельный оверлей (НЕ .modal-overlay: тем классом управляет #infoToggle) */
 .prof-overlay{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;
   padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -1664,30 +1664,30 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         <div class="auto-grid">
           <div class="astage" id="autoStage1">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn1" checked onchange="renderAutoStatus()"><span class="as-num">1</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff1" type="number" value="1.50" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn1" type="number" value="1.70" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff1" type="number" inputmode="decimal" value="1.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn1" type="number" inputmode="decimal" value="1.70" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage2">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn2" checked onchange="renderAutoStatus()"><span class="as-num">2</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="number" value="2.50" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="number" value="3.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="number" inputmode="decimal" value="2.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="number" inputmode="decimal" value="3.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage3">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn3" checked onchange="renderAutoStatus()"><span class="as-num">3</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="number" value="4.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="number" value="5.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="number" inputmode="decimal" value="4.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="number" inputmode="decimal" value="5.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage4">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn4" checked onchange="renderAutoStatus()"><span class="as-num">4</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="number" value="7.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="number" value="8.00" step="0.1" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="number" inputmode="decimal" value="7.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="number" inputmode="decimal" value="8.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
         </div>
         <div class="auto-final" id="autoFinalRow">
           <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoFinalEn" checked onchange="renderAutoStatus()"><span class="as-num">5</span></label>
           <div class="as-field">
             <label class="as-lbl off">final off &times;</label>
-            <input class="as-input off-in" id="autoFinalOff" type="number" value="12.00" step="0.5" min="1.01" onchange="renderAutoStatus()">
+            <input class="as-input off-in" id="autoFinalOff" type="number" inputmode="decimal" value="12.00" step="any" min="1.01" onchange="renderAutoStatus()">
           </div>
         </div>
         <div class="auto-status" id="autoStatus" hidden></div>
@@ -1705,7 +1705,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
     <label class="prof-btn" for="profToggle" role="button" aria-label="My game history" onclick="profOpen()">
       <span class="prof-ava" id="profAva">V</span>
       <span class="prof-nick" id="profNick">connecting&#8230;</span>
-      <span class="prof-hint">history</span>
+      <span class="prof-hint">My Bets</span>
     </label>
     <div class="lb-title">
       <span class="lb-title-dot" id="lbPhaseDot"></span>
@@ -1803,7 +1803,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   <label class="modal-backdrop" for="profToggle" aria-label="Close"></label>
   <div class="modal-box">
     <label class="modal-close" for="profToggle" role="button" aria-label="Close">&#215;</label>
-    <div class="modal-title">My Game History</div>
+    <div class="modal-title">My Bets</div>
     <div class="modal-body" id="profHistBody"><p style="color:var(--t3)">Loading&#8230;</p></div>
   </div>
 </div>
@@ -2013,8 +2013,18 @@ function sndSynth(name){
   return b;
 }
 
+/* iOS/Safari: беззвучный 1-семпловый буфер, проигранный ВНУТРИ жеста, снимает
+   аудио-блокировку WebAudio — без него на iPhone контекст «running», но глухой */
+function sndUnlock(){
+  try {
+    const s = SND.ctx.createBufferSource();
+    s.buffer = SND.ctx.createBuffer(1, 1, 22050);
+    s.connect(SND.ctx.destination); s.start(0);
+  } catch (e) {}
+}
 function sndInit(){                        // вызывается при загрузке и на каждом жесте
   if (SND.ctx){
+    sndUnlock();                           // повторная разблокировка iOS на каждом жесте — безвредна
     if (SND.ctx.state === 'suspended') SND.ctx.resume().then(() => {
       // контекст ожил (первый жест после заблокированного автозапуска) —
       // если раунд уже идёт, догоняем гул напряжения
@@ -2028,6 +2038,7 @@ function sndInit(){                        // вызывается при заг
   SND.master = SND.ctx.createGain();
   SND.master.gain.value = SND.on ? SND.vol : 0;
   SND.master.connect(SND.ctx.destination);
+  sndUnlock();                             // разблокировать iOS сразу при создании контекста в жесте
   Promise.all(SND.names.map(async n => {
     try {
       const r = await fetch('sounds/' + n + '.wav');

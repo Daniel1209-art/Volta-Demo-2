@@ -158,7 +158,7 @@ function serverMult(){
 /* ставки ботов подчиняются тому же лимиту MAX_BET, что и у живых игроков */
 const BET_TIERS = [5,10,15,20,25,30,50,75,90,100].map(v => Math.min(v, E.MAX_BET));
 function spawnBots(){
-  const target = 11 + Math.floor(Math.random() * 7);          // размер «живого» стола 11–17
+  const target = 12 + Math.floor(Math.random() * 19);         // размер «живого» стола 12–30 (варьируется каждый раунд)
   const real = [...players.values()].filter(p => p.sockets.size > 0).length;
   const n = Math.max(0, target - real);
   const used = new Set([...players.values()].map(p => p.nick));

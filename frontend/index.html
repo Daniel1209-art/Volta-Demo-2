@@ -79,7 +79,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
   border-bottom:1px solid var(--brd);padding:8px 14px;
   display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
 .hist-bar::-webkit-scrollbar{display:none}
-.hist-lbl{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;
+.hist-lbl{font-size:9px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;
   white-space:nowrap;flex-shrink:0;font-weight:600}
 .hc{flex-shrink:0;font-size:var(--fs-sm);font-weight:600;padding:4px 12px;border-radius:20px}
 .hc-l{background:var(--g2);color:var(--g)}
@@ -1058,11 +1058,19 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
    вбок от лампы, зона узлов — на всю ширину; размер лампы задан от высоты
    вьюпорта (в скролл-контексте компактной ветки height:100% схлопывается) */
 @media (min-width:640px) and (max-width:1023px) and (min-aspect-ratio:13/10) and (max-height:680px){
+  /* min-height:min-content — карточка НЕ сжимается флексом ниже своего содержимого
+     (лампа/инфо-колонка), поэтому её содержимое не выдавливается на таймер ниже;
+     если места не хватает — .game-zone скроллится (overflow-y:auto в ветке ≤520px) */
   .lamp-card{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto;
-    align-items:center;justify-items:center;column-gap:clamp(8px,1.8vw,18px);padding:8px 14px}
-  .lamp-outer{grid-column:1;grid-row:1;width:auto;height:clamp(120px,54vh,340px);
+    align-items:center;justify-items:center;column-gap:clamp(8px,1.8vw,18px);padding:8px 14px;
+    min-height:min-content}
+  /* высота лампы = доступная высота (вьюпорт минус шапка/вольтаж/таймер/зазоры ≈278px),
+     но не больше 54vh и не меньше 90px. Раньше был жёсткий 54vh — на низких
+     ландшафтах (напр. 844×390) он превышал высоту карточки, и лампа с инфо-колонкой
+     наезжали на таймер ROUND LIVE. Теперь лампа всегда влезает в свою карточку. */
+  .lamp-outer{grid-column:1;grid-row:1;width:auto;height:clamp(90px,calc(100dvh - 278px),54vh);
     aspect-ratio:1;max-width:100%}
-  .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;gap:clamp(5px,1.2vh,10px)}
+  .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;gap:clamp(4px,1vh,9px)}
 }
 /* short landscape phones — compact (not remove) the history/wire/timer chrome
    so every element stays reachable, and float ON/OFF to the top of the rail
@@ -1074,6 +1082,12 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .wire-bridge{--wire:12px}
   .start-timer{padding:4px 10px;gap:2px}
   .start-timer .st-bar{display:none}
+  /* инфо-колонка вплотную к лампе: минимальные зазоры и компактный личный ×,
+     чтобы столбик (статус · точки · личный ×) был не выше карточки лампы и
+     ничего не выдавливалось на таймер */
+  .lamp-info-col{gap:3px}
+  .pers-box{padding:2px 10px;min-width:0}
+  .pers-val{font-size:clamp(15px,4.4vh,20px)}
   /* the compacted chrome + the lamp's 150px floor (--lamp) can still add up to
      more than a very short viewport (e.g. ~320px tall) — let this column
      scroll rather than silently clip under the two-column mode's overflow:hidden */
@@ -1188,7 +1202,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
 .prof-nick{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--gold);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
-.prof-hint{font-size:8px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
+.prof-hint{font-size:8px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
 @media(max-width:719px){.prof-btn{padding-right:58px}}   /* не под кнопкой × в шторке */
 /* отдельный оверлей (НЕ .modal-overlay: тем классом управляет #infoToggle) */
 .prof-overlay{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;
@@ -3064,6 +3078,21 @@ try {
   $('musVol').style.setProperty('--vfill', Math.round(MUS.vol * 100) + '%');
   document.querySelector('.snd-pop').classList.toggle('mus-off', !MUS.on);
   musRenderSelect();
+  /* iOS Safari fallback: тап по <label for=скрытый-чекбокс> в Safari иногда НЕ
+     переключает чекбокс (особенно с role="button") — из-за этого шторка Autoplay,
+     панель звука, лидерборд и др. «не кликались» на iPhone. Дублируем
+     переключение в JS. preventDefault убирает нативное действие, поэтому в
+     браузерах, где оно работает, двойного тумблера не будет. */
+  document.addEventListener('click', (e) => {
+    const lbl = e.target.closest('label[for]');
+    if (!lbl) return;
+    const tgt = document.getElementById(lbl.getAttribute('for'));
+    if (!tgt || !tgt.classList.contains('vis-toggle')) return;
+    e.preventDefault();
+    if (tgt.type === 'radio') tgt.checked = true;
+    else tgt.checked = !tgt.checked;
+    tgt.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   /* аудио: пробуем стартовать сразу при загрузке. Где браузер разрешает
      autoplay (например, Chrome при высоком media engagement у сайта) — музыка
      и эффекты заиграют без единого клика; где запрещает — молча ждём первый

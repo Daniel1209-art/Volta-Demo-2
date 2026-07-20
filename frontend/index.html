@@ -146,6 +146,17 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 .snd-select option{background:var(--s1);color:var(--txt)}
 /* тумблер музыки dimmed, когда музыка выключена — заглушать выбор трека не нужно */
 .snd-pop.mus-off .snd-select{opacity:.5}
+/* плашка «нажмите для звука» — iOS блокирует звук до жеста; фон сплошной rgba
+   (без color-mix/backdrop-filter, чтобы работало и на старых iOS <16.2) */
+.snd-hint{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);z-index:1300;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:999px;border:1px solid rgba(168,85,247,.45);
+  background:rgba(18,14,28,.95);color:#ece8f8;font-family:inherit;font-size:12.5px;
+  font-weight:600;letter-spacing:.02em;box-shadow:0 8px 30px rgba(0,0,0,.55);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:opacity .3s ease,transform .3s ease}
+.snd-hint[hidden]{display:none}
+.snd-hint.hide{opacity:0;transform:translateX(-50%) translateY(10px);pointer-events:none}
 
 /* MAIN */
 .main-content{display:flex;flex-direction:column;gap:8px;padding:0 12px;flex:1}
@@ -1678,30 +1689,30 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         <div class="auto-grid">
           <div class="astage" id="autoStage1">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn1" checked onchange="renderAutoStatus()"><span class="as-num">1</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff1" type="number" inputmode="decimal" value="1.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn1" type="number" inputmode="decimal" value="1.70" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff1" type="text" inputmode="decimal" value="1.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn1" type="text" inputmode="decimal" value="1.70" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage2">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn2" checked onchange="renderAutoStatus()"><span class="as-num">2</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="number" inputmode="decimal" value="2.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="number" inputmode="decimal" value="3.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="text" inputmode="decimal" value="2.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="text" inputmode="decimal" value="3.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage3">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn3" checked onchange="renderAutoStatus()"><span class="as-num">3</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="number" inputmode="decimal" value="4.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="number" inputmode="decimal" value="5.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="text" inputmode="decimal" value="4.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="text" inputmode="decimal" value="5.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
           <div class="astage" id="autoStage4">
             <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn4" checked onchange="renderAutoStatus()"><span class="as-num">4</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="number" inputmode="decimal" value="7.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="number" inputmode="decimal" value="8.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="text" inputmode="decimal" value="7.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
+            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="text" inputmode="decimal" value="8.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
         </div>
         <div class="auto-final" id="autoFinalRow">
           <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoFinalEn" checked onchange="renderAutoStatus()"><span class="as-num">5</span></label>
           <div class="as-field">
             <label class="as-lbl off">final off &times;</label>
-            <input class="as-input off-in" id="autoFinalOff" type="number" inputmode="decimal" value="12.00" step="any" min="1.01" onchange="renderAutoStatus()">
+            <input class="as-input off-in" id="autoFinalOff" type="text" inputmode="decimal" value="12.00" step="any" min="1.01" onchange="renderAutoStatus()">
           </div>
         </div>
         <div class="auto-status" id="autoStatus" hidden></div>
@@ -1758,6 +1769,10 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 <label class="lb-backdrop" for="lbToggle" aria-hidden="true"></label>
 <label class="auto-backdrop" for="autoToggle" aria-hidden="true"></label>
 <label class="snd-backdrop" for="sndToggle" aria-hidden="true"></label>
+
+<!-- плашка «нажмите для звука»: iOS не даёт звук до касания; показывается только
+     если аудио заблокировано, исчезает на первом тапе/клике (см. скрипт ниже) -->
+<button id="sndHint" class="snd-hint" type="button" hidden aria-label="Tap to enable sound">&#128266; Tap for sound</button>
 
 <!-- ПАНЕЛЬ ЗВУКА — всплывает под кнопкой-динамиком в шапке -->
 <div class="snd-pop" role="group" aria-label="Sound settings">
@@ -2068,7 +2083,9 @@ function sndInit(){                        // вызывается при заг
     if (SND.on && typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
   });
 }
-['pointerdown','keydown','touchstart'].forEach(ev => addEventListener(ev, sndInit, { passive: true }));
+/* touchend и click добавлены к pointerdown/touchstart/keydown: на iOS Safari
+   разблокировка аудио надёжнее всего срабатывает именно на завершении касания */
+['pointerdown','touchstart','touchend','click','keydown'].forEach(ev => addEventListener(ev, sndInit, { passive: true }));
 
 function sfx(n, g = 1, rate = 1){
   /* state !== running: контекст создан при загрузке, но autoplay ещё заблокирован —
@@ -2168,12 +2185,17 @@ function musApply(restart){             // приводит проигрыват
   const el = musEl();
   if (!MUS.on || !MUS.track){ musFadeTo(0, () => el.pause()); return; }
   const need = restart || !musSrcIs(MUS.track);
-  const go = () => {
-    clearInterval(MUS.fade);          // убить любой висящий fade-out, чтобы он не поставил на паузу новый трек
-    if (need){ el.src = 'Music/' + MUS.track + '.mp3'; el.loop = true; el.volume = 0; }
-    el.play().then(() => musFadeTo(MUS.vol)).catch(() => {});   // до первого жеста браузер может молчать
-  };
-  if (need && !el.paused) musFadeTo(0, go); else go();
+  /* iOS Safari: play() РАЗРЕШЁН только синхронно в стеке пользовательского жеста.
+     Раньше при смене трека play() откладывался в таймер fade-out (musFadeTo(0, go)) —
+     то есть вызывался ВНЕ жеста, и Safari его блокировал: трек менялся только после
+     reload. Теперь src+play() ставим СРАЗУ (синхронно в обработчике change), а
+     плавность делаем только фейдом ГРОМКОСТИ (el.volume 0 → MUS.vol). Старый трек
+     обрывается мгновенно — зато переключение работает без перезагрузки. */
+  clearInterval(MUS.fade);            // убить висящий fade, чтобы он не сбросил громкость нового трека
+  if (need){ el.src = 'Music/' + MUS.track + '.mp3'; el.loop = true; el.volume = 0; }
+  const p = el.play();                 // синхронный play — обязателен для iOS
+  if (p && p.then) p.then(() => musFadeTo(MUS.vol)).catch(() => {});  // до первого жеста браузер может молчать
+  else musFadeTo(MUS.vol);
 }
 function musSetEnabled(on){             // тумблер музыки (как у эффектов)
   MUS.on = on; musSave();
@@ -2198,7 +2220,31 @@ function musRenderSelect(){
 }
 /* первый жест: снять autoplay-блокировку, если музыка включена */
 function musResume(){ if (MUS.on && MUS.track && (!MUS.el || MUS.el.paused)) musApply(false); }
-['pointerdown','keydown','touchstart'].forEach(ev => addEventListener(ev, musResume, { passive: true }));
+['pointerdown','touchstart','touchend','click','keydown'].forEach(ev => addEventListener(ev, musResume, { passive: true }));
+
+/* плашка «нажмите для звука»: iOS блокирует звук до жеста — показываем подсказку
+   (только если аудио не стартовало), прячем на первом касании/клике и запускаем
+   музыку+эффекты. На десктопе/Android, где autoplay разрешён, плашка не появляется. */
+(function(){
+  const hint = document.getElementById('sndHint');
+  if (!hint) return;
+  let done = false;
+  const dismiss = () => {
+    if (done) return; done = true;
+    try { sndInit(); musResume(); } catch (e) {}
+    hint.classList.add('hide');
+    setTimeout(() => { try { hint.remove(); } catch (e) {} }, 400);
+  };
+  hint.addEventListener('click', dismiss);
+  ['pointerdown','touchend','click','keydown'].forEach(ev =>
+    addEventListener(ev, dismiss, { passive: true, once: true }));
+  /* показать подсказку, только если через 700мс звук всё ещё заблокирован */
+  setTimeout(() => {
+    if (done) return;
+    const live = SND.ctx && SND.ctx.state === 'running';
+    if (!live) hint.hidden = false;
+  }, 700);
+})();
 
 /* ── MULTIPLIER TIER → drives PCB traces, aura & lamp glow colour ──── */
 function tierClass(m){
@@ -2675,17 +2721,27 @@ function onAutoMasterToggle(){
   }
   renderAutoStatus();
 }
+/* устойчивый разбор десятичного значения из поля: на русской (и др.) локали iOS
+   пользователь вводит запятую («1,5»), обычный parseFloat даёт NaN → все ступени
+   отбрасывались и автопилот молча не работал. Меняем запятую на точку и берём
+   первое число из строки. Поля ступеней — type=text inputmode=decimal, поэтому
+   сырой текст всегда читается (type=number при вводе запятой давал value=""). */
+function parseDec(v){
+  if (v == null) return NaN;
+  const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
+}
 function buildAutoActions(){
   const acts = [];
   for (let n = 1; n <= 4; n++){
     if (!$('autoStageEn' + n).checked) continue;
-    const off = parseFloat($('autoOff' + n).value);
-    const onV = parseFloat($('autoOn' + n).value);
+    const off = parseDec($('autoOff' + n).value);
+    const onV = parseDec($('autoOn' + n).value);
     if (off && off > 1) acts.push({ type: 'off', m: off, stage: n, fired: false });
     if (onV && onV > 1) acts.push({ type: 'on',  m: onV, stage: n, fired: false });
   }
   if ($('autoFinalEn').checked){
-    const fOff = parseFloat($('autoFinalOff').value);
+    const fOff = parseDec($('autoFinalOff').value);
     if (fOff && fOff > 1) acts.push({ type: 'off', m: fOff, stage: 'final', fired: false });
   }
   acts.sort((a, b) => a.m - b.m);
@@ -2694,6 +2750,7 @@ function buildAutoActions(){
 function snapshotAuto(){
   G.auto.on = $('autoEnable').checked;
   G.auto.actions = G.auto.on ? buildAutoActions() : [];
+  renderAutoStatus();                // обновить подсказку под новый раунд/ставку
 }
 function processAuto(curMult){
   if (!G.auto.on || G.phase !== 'IN_PROGRESS' || !G.bet) return;
@@ -2724,8 +2781,13 @@ function renderAutoStatus(){
   const ons = acts.filter(a => a.type === 'on').length;
   const warn = ons > MAX_SWITCHES
     ? `<br>⚠️ plan has ${ons} ON > limit of ${MAX_SWITCHES}.` : '';
+  /* явная подсказка вместо «молчаливого бездействия»: автопилот управляет лампой
+     ТОЛЬКО при активной ставке. Нет ставки — говорим об этом прямо. */
+  const noBet = !G.bet
+    ? '<br>⚡ <b style="color:var(--gold)">Place a bet</b> — autopilot controls the lamp only with an active bet.'
+    : '';
   const live = G.phase === 'IN_PROGRESS' ? '' : '<br>Applies from the start of the next round.';
-  el.innerHTML = `Start ON → ${seq}${warn}${live}`;
+  el.innerHTML = `Start ON → ${seq}${warn}${noBet}${live}`;
 }
 
 /* ── BET ──────────────────────────────────────────────────────────── */
@@ -2749,6 +2811,7 @@ function placeBet(){
   bb.disabled = true; bb.classList.add('placed'); bb.textContent = '✓ bet accepted';
   $('betNote').innerHTML = `in play <b style="color:var(--gold)">${fmt(a, 0)}</b> · lamp turns on at start`;
   renderPre();                       // player joins the shared table
+  renderAutoStatus();                // ставка появилась → убрать подсказку «Place a bet» в автопилоте
 }
 function qb(f){ const e = $('betAmt'); e.value = Math.min(MAX_BET, Math.max(1, Math.floor((parseFloat(e.value) || 1) * f))); }
 function qbf(v){ $('betAmt').value = Math.min(MAX_BET, v); }

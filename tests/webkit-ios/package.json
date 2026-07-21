@@ -1,0 +1,13 @@
+{
+  "name": "volta-webkit-ios-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Проверки под движок Safari (WebKit) с iPhone-вьюпортом и локалью ru-RU",
+  "scripts": {
+    "autopilot": "node autopilot.js",
+    "music": "node music-toggle.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}

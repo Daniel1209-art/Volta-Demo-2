@@ -157,6 +157,11 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
   transition:opacity .3s ease,transform .3s ease}
 .snd-hint[hidden]{display:none}
 .snd-hint.hide{opacity:0;transform:translateX(-50%) translateY(10px);pointer-events:none}
+/* плашка звука висит внизу по центру на z-index выше шторок — при открытой
+   шторке она ложится прямо на поля Autoplay и перехватывает касание */
+body:has(#autoToggle:checked) .snd-hint,
+body:has(#lbToggle:checked) .snd-hint,
+body:has(#sndToggle:checked) .snd-hint{display:none}
 
 /* MAIN */
 .main-content{display:flex;flex-direction:column;gap:8px;padding:0 12px;flex:1}
@@ -936,7 +941,10 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
     box-shadow:0 -12px 44px rgba(0,0,0,.6);
     padding:10px clamp(12px,4vw,18px) calc(16px + env(safe-area-inset-bottom,0px))}
   .auto-card .auto-head{padding-right:46px}
-  #autoToggle:checked ~ .app .auto-card{transform:translateY(0)}
+  /* второй селектор — для случая, когда карточка вынесена в body (см. sheetHost
+     в скрипте): на iOS она обязана жить ВНЕ скролл-контейнера .main-content */
+  #autoToggle:checked ~ .app .auto-card,
+  #autoToggle:checked ~ .auto-card{transform:translateY(0)}
   .auto-backdrop{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 74%,transparent);
     z-index:1090;opacity:0;pointer-events:none;transition:opacity .3s;cursor:pointer}
   #autoToggle:checked ~ .auto-backdrop{opacity:1;pointer-events:auto}
@@ -3205,6 +3213,123 @@ try {
   if (st) { st.textContent = 'error'; st.style.color = 'var(--r)'; }
   alert('VOLTA failed to start: ' + err.message);
 }
+
+/* ═══ iOS: ШТОРКА AUTOPLAY ДОЛЖНА ЖИТЬ ВНЕ СКРОЛЛ-КОНТЕЙНЕРА ══════════════
+   .auto-card лежит в разметке внутри .controls → .main-content, а на мобиле
+   .main-content — скроллер с -webkit-overflow-scrolling:touch. В iOS Safari
+   position:fixed внутри инерционного скроллера РИСУЕТСЯ правильно, но теряет
+   hit-testing: шторка видна и при этом полностью глуха к касаниям — ни поля,
+   ни тумблер не нажимаются. Лидерборд и панель звука лежат вне .main-content,
+   поэтому работают. Chrome и desktop-WebKit этот баг не воспроизводят.
+   Лечение: в режиме шторки переносим карточку в body, на десктопе возвращаем
+   на место (там она — обычный блок в потоке .controls). */
+(function(){
+  const card = document.querySelector('.auto-card');
+  if (!card) return;
+  /* держать в синхроне с @media-условием блока «.auto-card{position:fixed…}» */
+  const SHEET_MQ = '(max-width:767px),(max-width:1023px) and (max-height:560px) and (min-aspect-ratio:13/10)';
+  const homeParent = card.parentNode;
+  const homeNext = card.nextSibling;
+  const mq = matchMedia(SHEET_MQ);
+  const place = () => {
+    if (mq.matches){
+      if (card.parentNode !== document.body) document.body.appendChild(card);
+    } else if (card.parentNode !== homeParent){
+      homeParent.insertBefore(card, homeNext);
+    }
+  };
+  place();
+  mq.addEventListener ? mq.addEventListener('change', place) : mq.addListener(place);
+  addEventListener('orientationchange', place);
+})();
+
+/* ═══ ДИАГНОСТИКА ДЛЯ РЕАЛЬНОГО УСТРОЙСТВА — только по ?diag=1 ═══════════
+   Нужна, потому что баг «панель Autoplay не принимает касания» не
+   воспроизводится ни в Chrome, ни в WebKit-эмуляции: он проявляется только
+   на живом iOS Safari. Панель показывает, КАКОЙ элемент реально получает
+   тап (elementFromPoint), нет ли поверх полей невидимого перекрытия и какие
+   CSS-возможности поддерживает устройство. Обычные игроки её не видят. */
+(function(){
+  if (!/[?&]diag=1/.test(location.search)) return;
+  const box = document.createElement('div');
+  box.id = 'voltaDiag';
+  box.style.cssText = 'position:fixed;left:4px;right:4px;top:4px;z-index:99999;max-height:46vh;' +
+    'overflow:auto;background:#000;color:#0f0;font:10px/1.35 monospace;padding:6px 8px;' +
+    'border:1px solid #0f0;border-radius:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text';
+  document.body.appendChild(box);
+
+  const hits = [];
+  const name = el => !el ? 'null'
+    : el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+      (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '');
+
+  // что реально лежит в центре элемента — так видно перекрытие
+  const topAt = id => {
+    const el = document.getElementById(id);
+    if (!el) return id + ': НЕТ В DOM';
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return id + ': скрыт (0x0)';
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const ok = hit === el || el.contains(hit);
+    return id + ': ' + (ok ? 'ДОСТУПЕН' : 'ПЕРЕКРЫТ → ' + name(hit)) +
+      ' [' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' +
+      Math.round(r.width) + 'x' + Math.round(r.height) + ']';
+  };
+
+  const cs = (sel, props) => {
+    const el = document.querySelector(sel);
+    if (!el) return sel + ': нет';
+    const s = getComputedStyle(el);
+    return sel + ': ' + props.map(p => p + '=' + s[p]).join(' ');
+  };
+
+  const render = () => {
+    const vv = window.visualViewport;
+    box.textContent = [
+      'VOLTA diag · ' + navigator.userAgent.replace(/^Mozilla\S* /, '').slice(0, 78),
+      'вьюпорт ' + innerWidth + 'x' + innerHeight +
+        (vv ? ' | visual ' + Math.round(vv.width) + 'x' + Math.round(vv.height) : ''),
+      'поддержка: color-mix=' + CSS.supports('color', 'color-mix(in srgb,red,blue)') +
+        ' has=' + CSS.supports('selector(:has(a))') +
+        ' dvh=' + CSS.supports('height', '100dvh'),
+      '',
+      'autoToggle(шторка)=' + (document.getElementById('autoToggle') || {}).checked +
+        '  autoEnable=' + (document.getElementById('autoEnable') || {}).checked +
+        '  sndToggle=' + (document.getElementById('sndToggle') || {}).checked,
+      'stage1..4=' + [1, 2, 3, 4].map(n => (document.getElementById('autoStageEn' + n) || {}).checked).join(','),
+      '',
+      '── доступность (центр элемента) ──',
+      topAt('autoOff1'), topAt('autoOn1'), topAt('autoEnable'), topAt('autoStageEn1'), topAt('betBtn'),
+      '',
+      cs('.auto-card', ['pointerEvents', 'zIndex', 'transform', 'position', 'visibility', 'opacity']),
+      cs('#autoOff1', ['pointerEvents', 'webkitUserSelect', 'touchAction']),
+      cs('.auto-backdrop', ['pointerEvents', 'zIndex', 'opacity']),
+      cs('.snd-hint', ['display', 'pointerEvents', 'zIndex']),
+      '',
+      '── касания (последние 6) ──',
+      hits.length ? hits.join('\n') : 'коснитесь поля Autoplay — здесь появится, что поймало касание',
+    ].join('\n');
+  };
+
+  ['touchstart', 'click'].forEach(ev => addEventListener(ev, e => {
+    const t = e.touches && e.touches[0] ? e.touches[0] : e;
+    const hit = document.elementFromPoint(t.clientX || 0, t.clientY || 0);
+    hits.unshift(ev + ' @' + Math.round(t.clientX || 0) + ',' + Math.round(t.clientY || 0) +
+      ' → ' + name(hit));
+    hits.length = Math.min(hits.length, 6);
+    render();
+  }, { capture: true, passive: true }));
+
+  // фокус в поле — доказательство, что клавиатура вообще открывается
+  document.addEventListener('focusin', e => {
+    hits.unshift('ФОКУС → ' + name(e.target));
+    hits.length = Math.min(hits.length, 6);
+    render();
+  }, true);
+
+  render();
+  setInterval(render, 1000);
+})();
 </script>
 
 </body>

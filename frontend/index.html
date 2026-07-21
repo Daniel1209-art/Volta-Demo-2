@@ -1127,12 +1127,12 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
       небольшие ноутбуки): зона схемных узлов тянется на ВСЮ ширину без пустот,
       инфо-колонка (статус · переключения · личный ×) уезжает ВБОК от лампы,
       лампа забирает всю высоту зоны ── */
-@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-aspect-ratio:2/1){
+@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-aspect-ratio:1332/1000){
   /* (v13) лампа забирает ВСЮ доступную высоту строки (height:100% + aspect-ratio:1),
-     а карточка-схема ужимается по содержимому (margin-inline:auto → shrink-to-fit),
-     поэтому пустого поля схемы по бокам не остаётся ни на одной ширине. Размер
-     меняется плавно от высоты окна — точек-разрывов больше нет. */
-  .lamp-card{align-self:stretch;width:auto;max-width:100%;margin-inline:auto;
+     а зона схемы тянется на ВСЮ ширину — пустого пространства вокруг карточки
+     быть не должно. Размер лампы меняется плавно от высоты окна: точки-разрыва
+     на 850px больше нет, инфо-колонка всегда сбоку, а не под лампой. */
+  .lamp-card{align-self:stretch;width:auto;max-width:none;margin-inline:0;
     grid-template-columns:minmax(0,1fr) minmax(150px,auto);grid-template-rows:100%;
     align-items:center;justify-items:center;column-gap:clamp(10px,2vw,26px);
     padding:10px clamp(14px,2.6vw,30px)}
@@ -1187,9 +1187,15 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
    leaderboard, so the lamp zone becomes tall + square and the lamp scales up to
    fill it (fixes the tiny-lamp-in-a-wide-empty-zone feel). ≥1024px landscape only.
    ═══════════════════════════════════════════════════════════════════════════ */
-/* ── PRIORITY 3 — COCKPIT: only for ultrawide (≥2:1), where neither the standard nor
-      the C play-dock keeps a good lamp ratio; controls move to a rail between lamp+LB. */
-@media(min-width:1024px) and (min-aspect-ratio:2/1){
+/* ── PRIORITY 3 — КОКПИТ: управление уезжает в вертикальную рейку СПРАВА, игровая
+      зона становится высокой/квадратной и лампа заполняет её.
+      (v14) Порог понижен с 2:1 до 4:3. Раньше кокпит включался только на
+      ультрашироких, а типовые ноутбучные 1280x700 / 1366x768 / 1440x900 /
+      1920x1080 (соотношение 1.33–1.8) попадали в «широкую низкую зону»: лампа
+      мелкая в центре, по бокам внутри зоны пусто. Блок выше (PRIORITY 2)
+      ограничен 1332/1000, чтобы два режима не пересекались — иначе от него
+      протекали grid-template-columns и ломали раскладку кокпита. */
+@media(min-width:1024px) and (min-aspect-ratio:4/3){
   .main-content{display:grid;grid-template-columns:minmax(0,1fr) clamp(272px,22vw,352px);
     grid-template-areas:"game ctrl";gap:clamp(14px,1.5vw,22px);align-items:stretch;overflow:hidden}
   .game-zone{grid-area:game;display:flex;flex-direction:column;min-width:0;min-height:0;gap:clamp(6px,1.2vh,14px)}

@@ -2187,7 +2187,20 @@ function musFadeTo(target, then){       // мягкий кроссфейд бе�
 function musSrcIs(name){ try { return decodeURIComponent(musEl().src).indexOf('/Music/' + name + '.mp3') !== -1; } catch (e) { return false; } }
 function musApply(restart){             // приводит проигрыватель к текущему состоянию MUS
   const el = musEl();
-  if (!MUS.on || !MUS.track){ musFadeTo(0, () => el.pause()); return; }
+  /* ВЫКЛЮЧЕНИЕ — строго синхронно, в том же тике, что и тап по тумблеру.
+     Раньше pause() был колбэком в конце фейда громкости (musFadeTo(0, …)):
+     на десктопе это давало 334 мс «доигрывания», а на iOS — бесконечное, потому
+     что там HTMLMediaElement.volume доступен только для чтения (громкость меняют
+     только аппаратные кнопки). el.volume += … там no-op, условие выхода из фейда
+     не выполняется никогда, значит колбэк с pause() не вызывается вообще и музыка
+     продолжает играть. Поэтому глушим сразу и pause(), и muted на текущем инстансе. */
+  if (!MUS.on || !MUS.track){
+    clearInterval(MUS.fade);
+    el.pause();
+    el.muted = true;
+    return;
+  }
+  el.muted = false;                   // снять глушение перед включением
   const need = restart || !musSrcIs(MUS.track);
   /* iOS Safari: play() РАЗРЕШЁН только синхронно в стеке пользовательского жеста.
      Раньше при смене трека play() откладывался в таймер fade-out (musFadeTo(0, go)) —

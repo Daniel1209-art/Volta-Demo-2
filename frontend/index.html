@@ -1127,13 +1127,17 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
       небольшие ноутбуки): зона схемных узлов тянется на ВСЮ ширину без пустот,
       инфо-колонка (статус · переключения · личный ×) уезжает ВБОК от лампы,
       лампа забирает всю высоту зоны ── */
-@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-height:850px) and (max-aspect-ratio:2/1){
-  .lamp-card{align-self:stretch;width:auto;max-width:none;margin-inline:0;
+@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-aspect-ratio:2/1){
+  /* (v13) лампа забирает ВСЮ доступную высоту строки (height:100% + aspect-ratio:1),
+     а карточка-схема ужимается по содержимому (margin-inline:auto → shrink-to-fit),
+     поэтому пустого поля схемы по бокам не остаётся ни на одной ширине. Размер
+     меняется плавно от высоты окна — точек-разрывов больше нет. */
+  .lamp-card{align-self:stretch;width:auto;max-width:100%;margin-inline:auto;
     grid-template-columns:minmax(0,1fr) minmax(150px,auto);grid-template-rows:100%;
     align-items:center;justify-items:center;column-gap:clamp(10px,2vw,26px);
     padding:10px clamp(14px,2.6vw,30px)}
   .lamp-outer{grid-column:1;grid-row:1;width:auto;height:100%;aspect-ratio:1;
-    max-width:100%;max-height:none;justify-self:center}
+    max-width:100%;max-height:min(620px,46vw);justify-self:center}
   .lamp-info-col{grid-column:2;grid-row:1;width:auto;align-self:center;
     gap:clamp(6px,1.4vh,14px)}
   .pers-box{padding:4px 12px;min-width:150px}

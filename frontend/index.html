@@ -1211,14 +1211,76 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   .controls{grid-area:ctrl;display:flex;flex-direction:column;min-width:0;min-height:0;max-height:none;
     overflow-y:auto;gap:clamp(10px,1.4vh,16px);align-items:stretch;
     scrollbar-width:thin;scrollbar-color:var(--brd2) transparent}
-  .bet-zone{flex:0 0 auto;flex-direction:column;gap:clamp(10px,1.4vh,16px)}
-  .bet-card,.lamp-ctrl,.auto-card{flex:0 0 auto}
-  .auto-card{display:block;min-height:auto;max-height:none}
-  .auto-card .auto-grid{grid-template-columns:1fr;overflow:visible;min-height:auto;flex:0 0 auto}
+  /* (v15) РЕЙКА ЗАПОЛНЯЕТ КОЛОНКУ ПО ВЫСОТЕ. Раньше все карточки были
+     flex:0 0 auto — на высоких окнах контент заканчивался выше низа рейки
+     (1920x1080: 176px, 2000x1010: 113px пустоты внизу). Теперь свободные
+     пиксели делятся между пультом ON/OFF (кнопки становятся крупнее — это
+     главные кнопки игры) и карточкой автопилота, ступени которой
+     распределяются по её высоте. grow есть, shrink НЕТ (flex:N 0 auto):
+     иначе на низких окнах карточки сжимались бы ниже содержимого — пульт
+     ON/OFF схлопывался в 26px. */
+  .bet-zone{flex:1 0 auto;flex-direction:column;gap:clamp(10px,1.4vh,16px)}
+  .bet-card{flex:0 0 auto}
+  .lamp-ctrl{flex:1 0 auto}
+  .auto-card{display:flex;flex-direction:column;flex:2 0 auto;max-height:none}
+  .auto-card .auto-grid{grid-template-columns:1fr;overflow:visible;min-height:auto;
+    flex:1 1 auto;align-content:space-between}
   /* the lamp fills the now tall/square zone */
   .lamp-card{flex:1 1 auto;display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:stretch}
   .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:min(70vh,680px);align-self:center}
   .lbtn{min-height:clamp(60px,8vh,104px);font-size:var(--fs-lbtn)}
+}
+/* ── КОРОТКИЕ ОКНА В КОКПИТЕ (порог 860px — именно до этой высоты рейка в
+      полном размере не помещается: её контенту нужно ~740px, а бокс равен
+      высоте окна минус ~114px хрома). Управление уезжало в собственный скролл,
+      часть автопилота приходилось доскроливать. Уплотняем внутренние отступы
+      карточек, чтобы рейка была видна целиком. ── */
+@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:860px){
+  .controls{gap:8px}
+  .bet-zone{gap:8px}
+  .lamp-ctrl{padding:9px}
+  .lbtn{min-height:clamp(44px,6.4vh,72px)}
+  .bet-card{padding:8px 12px 9px}
+  .bet-card .zone-title{margin-bottom:4px}
+  .bet-inp-wrap{padding:6px 12px;margin-bottom:6px}
+  .qrow{margin-bottom:6px}
+  .auto-card{padding:9px 12px}
+  .auto-head{margin-bottom:6px}
+  .auto-card .auto-grid{gap:4px}
+  .astage{padding:4px 8px}
+  .as-field{gap:2px}
+  .as-input{padding:4px 8px}
+  .auto-final{padding:4px 8px;margin-top:4px}
+}
+/* ── САМЫЕ НИЗКИЕ ОКНА В КОКПИТЕ (≤720px: 1280x650, 1280x700). Одних отступов
+      мало — подпись ступени («off ×» / «on ×») встаёт СЛЕВА от поля, а не над
+      ним: строка ступени становится ниже примерно на треть, и весь автопилот
+      помещается в рейку без внутреннего скролла. ── */
+@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:720px){
+  .as-field{flex-direction:row;align-items:center;gap:5px}
+  .as-lbl{flex:0 0 auto;white-space:nowrap}
+  .as-input{padding:3px 7px;font-size:12px;min-width:0}
+  .astage{padding:3px 8px}
+  .auto-final{padding:3px 8px}
+}
+/* ── ≤670px высоты (1280x650 и подобные «низкие» окна) — последний шаг
+      уплотнения: кнопки и отступы к минимуму, чтобы рейка помещалась целиком ── */
+@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:670px){
+  .controls{gap:6px}
+  .bet-zone{gap:6px}
+  .lamp-ctrl{padding:7px}
+  .lamp-ctrl .lamp-btns{gap:7px}
+  .lbtn{min-height:40px}
+  .bet-card{padding:6px 10px 7px}
+  .bet-inp-wrap{padding:5px 11px;margin-bottom:5px}
+  .qrow{gap:6px;margin-bottom:5px}
+  .qb{min-height:38px;padding:5px 4px}
+  .bet-btn{padding:9px;min-height:40px}
+  .bet-hint{margin-top:4px}
+  .auto-card{padding:7px 10px}
+  .auto-head{margin-bottom:4px}
+  .auto-card .auto-grid{gap:3px}
+  .auto-final{margin-top:3px}
 }
 
 /* ═══ PROFILE + MY GAME HISTORY — кнопка-ник над лидербордом и модалка ═══ */

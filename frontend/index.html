@@ -2138,7 +2138,9 @@ function sndInit(){                        // вызывается при заг
       // контекст ожил (первый жест после заблокированного автозапуска) —
       // если раунд уже идёт, догоняем гул напряжения
       if (SND.on && SND.ready && typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
+      musAttach();                         // и сразу заводим музыку в свой гейн
     }).catch(() => {});
+    else musAttach();
     return;
   }
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -2166,6 +2168,10 @@ function sndInit(){                        // вызывается при заг
 /* touchend и click добавлены к pointerdown/touchstart/keydown: на iOS Safari
    разблокировка аудио надёжнее всего срабатывает именно на завершении касания */
 ['pointerdown','touchstart','touchend','click','keydown'].forEach(ev => addEventListener(ev, sndInit, { passive: true }));
+/* Возврат во вкладку: iOS приостанавливает AudioContext при сворачивании и
+   входящих звонках. Музыка теперь идёт ЧЕРЕЗ контекст, поэтому его надо
+   будить, не дожидаясь следующего касания, — иначе <audio> играет «в тишину». */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) sndInit(); });
 
 function sfx(n, g = 1, rate = 1){
   /* state !== running: контекст создан при загрузке, но autoplay ещё заблокирован —
@@ -2237,7 +2243,8 @@ addEventListener('resize', () => { if ($('sndToggle') && $('sndToggle').checked)
 const MUS = {
   list: ['Lantern Drift 1','Lantern Drift 2','Volta Circuit 1','Volta Circuit 2',
          'Volta Circuit 3','Voltage Loop 1','Voltage Loop 2'],
-  el: null, on: true, track: 'Lantern Drift 1', vol: 0.5, fade: null   // дефолт: музыка вкл, Lantern Drift 1
+  el: null, on: true, track: 'Lantern Drift 1', vol: 0.5, fade: null,  // дефолт: музыка вкл, Lantern Drift 1
+  node: null, gain: null                                              // Web Audio: источник и свой гейн
 };
 try {
   const s = JSON.parse(localStorage.getItem('volta_mus') || '{}');
@@ -2251,8 +2258,60 @@ function musEl(){
   if (!MUS.el){ MUS.el = new Audio(); MUS.el.loop = true; MUS.el.preload = 'auto'; }  // трек играет по кругу
   return MUS.el;
 }
+/* ── ГРОМКОСТЬ МУЗЫКИ ЧЕРЕЗ WEB AUDIO ────────────────────────────────────────
+   На iOS Safari HTMLMediaElement.volume фактически доступен ТОЛЬКО ДЛЯ ЧТЕНИЯ:
+   Apple разрешает менять громкость лишь аппаратными кнопками, присваивание
+   el.volume молча игнорируется. Поэтому ползунок музыки на iPhone не работал.
+   Лечение: провести <audio> через MediaElementAudioSourceNode → собственный
+   GainNode → destination и менять gain, а не el.volume.
+     • Гейн музыки подключён к destination НАПРЯМУЮ, в обход SND.master, —
+       тумблер эффектов музыку не глушит, и наоборот.
+     • createMediaElementSource для одного элемента допустим ТОЛЬКО ОДИН РАЗ —
+       узел храним в MUS.node.
+     • Подключаемся лишь когда AudioContext уже 'running' (его будит sndInit на
+       первом жесте): элемент, заведённый в приостановленный контекст, замолкает
+       целиком. До этого момента работает прежний путь el.volume.
+     • Если Web Audio недоступен — тихо остаёмся на el.volume (десктоп-фолбэк).
+   mp3 отдаются с того же домена, поэтому CORS-ограничений нет.               */
+function musGraph(){
+  if (MUS.gain) return MUS.gain;
+  const ctx = SND.ctx;
+  if (!ctx || ctx.state !== 'running' || !ctx.createMediaElementSource) return null;
+  try {
+    const el = musEl();
+    MUS.node = ctx.createMediaElementSource(el);
+    MUS.gain = ctx.createGain();
+    MUS.gain.gain.value = MUS.on ? MUS.vol : 0;
+    MUS.node.connect(MUS.gain);
+    MUS.gain.connect(ctx.destination);      // мимо SND.master — независимо от эффектов
+    el.volume = 1;                          // дальше громкость целиком на гейне
+    return MUS.gain;
+  } catch (e){ MUS.node = null; MUS.gain = null; return null; }
+}
+/* вызывается из sndInit, как только контекст разбужен жестом: подключить музыку
+   к своему гейну заранее, не дожидаясь первого движения ползунка */
+function musAttach(){ try { if (MUS.el) musGraph(); } catch (e) {} }
+/* единственная точка установки громкости музыки: gain, если граф жив, иначе el.volume */
+function musVolTo(v, smooth){
+  v = Math.max(0, Math.min(1, v));
+  const g = musGraph();
+  if (g){
+    const t = SND.ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    if (smooth) g.gain.setTargetAtTime(v, t, 0.12);
+    else g.gain.setValueAtTime(v, t);
+    musEl().volume = 1;
+    return true;
+  }
+  try { musEl().volume = v; } catch (e) {}
+  return false;
+}
 function musFadeTo(target, then){       // мягкий кроссфейд без щелчков
   clearInterval(MUS.fade);
+  if (musVolTo(target, true)){          // Web Audio: фейд планирует сам гейн
+    if (then) setTimeout(then, 400);
+    return;
+  }
   const el = musEl(), step = 0.08;
   MUS.fade = setInterval(() => {
     const dv = target - el.volume;
@@ -2272,6 +2331,7 @@ function musApply(restart){             // приводит проигрыват
      продолжает играть. Поэтому глушим сразу и pause(), и muted на текущем инстансе. */
   if (!MUS.on || !MUS.track){
     clearInterval(MUS.fade);
+    musVolTo(0);                      // гейн в ноль (на iOS el.volume бесполезен)
     el.pause();
     el.muted = true;
     return;
@@ -2285,7 +2345,7 @@ function musApply(restart){             // приводит проигрыват
      плавность делаем только фейдом ГРОМКОСТИ (el.volume 0 → MUS.vol). Старый трек
      обрывается мгновенно — зато переключение работает без перезагрузки. */
   clearInterval(MUS.fade);            // убить висящий fade, чтобы он не сбросил громкость нового трека
-  if (need){ el.src = 'Music/' + MUS.track + '.mp3'; el.loop = true; el.volume = 0; }
+  if (need){ el.src = 'Music/' + MUS.track + '.mp3'; el.loop = true; musVolTo(0); }
   const p = el.play();                 // синхронный play — обязателен для iOS
   if (p && p.then) p.then(() => musFadeTo(MUS.vol)).catch(() => {});  // до первого жеста браузер может молчать
   else musFadeTo(MUS.vol);
@@ -2304,7 +2364,7 @@ function musSelectTrack(name){          // выбор трека из выпад
 function musSetVolume(v){
   MUS.vol = Math.min(1, Math.max(0, v / 100)); musSave();
   const el = $('musVol'); if (el) el.style.setProperty('--vfill', Math.round(MUS.vol * 100) + '%');
-  if (MUS.el && MUS.on && !MUS.el.paused){ clearInterval(MUS.fade); MUS.el.volume = MUS.vol; }
+  if (MUS.el && MUS.on){ clearInterval(MUS.fade); musVolTo(MUS.vol); }
 }
 function musRenderSelect(){
   const sel = $('musSelect'); if (!sel) return;

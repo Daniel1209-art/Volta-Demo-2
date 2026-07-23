@@ -1137,15 +1137,14 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
       Без этого инфо-колонка стоит ПОД лампой и съедает ~176px высоты, из-за
       чего лампа выходила мелкой: 1920x1080 — 353px вместо 529px.
 
-      (v16) Раньше блок был ограничен max-aspect-ratio:1332/1000, то есть
-      работал только на «почти квадратных» окнах, а все широкие уходили в
-      кокпит. Теперь он покрывает и широкие окна — но ТОЛЬКО достаточно
-      высокие (min-height:770px). Ниже 770px высоты лампе в режиме А остаётся
-      меньше ~280px, и там по-прежнему выигрывает кокпит. Два условия через
-      запятую взаимоисключающи с блоком кокпита ниже — иначе от этого блока
-      протекают grid-template-columns и ломают раскладку рейки. ── */
-@media (min-width:1024px) and (min-aspect-ratio:1/1) and (max-aspect-ratio:1332/1000),
-       (min-width:1024px) and (min-aspect-ratio:1332/1000) and (min-height:770px){
+      (v17) Режим А теперь — ТОЛЬКО для крупных мониторов (32″+). Физическую
+      диагональ браузер не отдаёт, поэтому прокси — ширина viewport в CSS-px:
+      32″ панели работают нативно на 2560×1440 (QHD) или 3840×2160 (4K), а
+      CSS-пиксель уже учитывает devicePixelRatio (4K@150% → viewport 2560).
+      Порог min-width:2560px согласован с заказчиком. Всё, что уже (ноутбуки,
+      24–27″ мониторы, 1280 / 1440×900 / 1920×1080), уходит в кокпит ниже.
+      Условие взаимоисключающе с блоком кокпита (там max-width:2559px). ── */
+@media (min-width:2560px) and (min-aspect-ratio:1/1){
   /* (v13) лампа забирает ВСЮ доступную высоту строки (height:100% + aspect-ratio:1),
      а зона схемы тянется на ВСЮ ширину — пустого пространства вокруг карточки
      быть не должно. Размер лампы меняется плавно от высоты окна: точки-разрыва
@@ -1214,15 +1213,12 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
       ультрашироких, а типовые ноутбучные 1280x700 / 1366x768 / 1440x900 /
       1920x1080 (соотношение 1.33–1.8) попадали в «широкую низкую зону»: лампа
       мелкая в центре, по бокам внутри зоны пусто.
-      (v16) Кокпит теперь НЕ режим по умолчанию для широких окон: он включается
-      только там, где окно ещё и НИЗКОЕ (max-height:769px). Причина в замерах:
-      лампа квадратная, поэтому её размер упирается в высоту, а не в ширину, и
-      строка кнопок внизу съедает 188–245px этой высоты. Пока высоты хватает
-      (>=770px), выигрывает улучшенный режим А из блока выше; когда её мало —
-      кокпит убирает строку кнопок вбок и отдаёт лампе всю высоту.
-      Условия двух блоков взаимоисключающи по высоте — иначе от режима А
-      протекают grid-template-columns и ломают раскладку рейки. */
-@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:769px){
+      (v17) Кокпит теперь — режим ПО УМОЛЧАНИЮ для всех десктопных окон уже
+      2560px (ноутбуки, обычные и широкие мониторы, любые высоты). Режим А из
+      блока выше включается только на 2560px и шире. Верхняя граница
+      max-width:2559px делает два блока взаимоисключающими по ширине — иначе от
+      режима А протекают grid-template-columns и ломают раскладку рейки. */
+@media(min-width:1024px) and (max-width:2559px) and (min-aspect-ratio:1/1){
   .main-content{display:grid;grid-template-columns:minmax(0,1fr) clamp(272px,22vw,352px);
     grid-template-areas:"game ctrl";gap:clamp(14px,1.5vw,22px);align-items:stretch;overflow:hidden}
   .game-zone{grid-area:game;display:flex;flex-direction:column;min-width:0;min-height:0;gap:clamp(6px,1.2vh,14px)}
@@ -1254,7 +1250,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
       (а он теперь только ≤769px высоты) она не помещалась и уезжала в
       собственный скролл — часть автопилота приходилось доскроливать.
       Уплотняем внутренние отступы карточек, чтобы рейка была видна целиком. ── */
-@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:769px){
+@media(min-width:1024px) and (max-width:2559px) and (min-aspect-ratio:4/3) and (max-height:769px){
   .controls{gap:8px}
   .bet-zone{gap:8px}
   .lamp-ctrl{padding:9px}
@@ -1275,7 +1271,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
       мало — подпись ступени («off ×» / «on ×») встаёт СЛЕВА от поля, а не над
       ним: строка ступени становится ниже примерно на треть, и весь автопилот
       помещается в рейку без внутреннего скролла. ── */
-@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:720px){
+@media(min-width:1024px) and (max-width:2559px) and (min-aspect-ratio:4/3) and (max-height:720px){
   .as-field{flex-direction:row;align-items:center;gap:5px}
   .as-lbl{flex:0 0 auto;white-space:nowrap}
   .as-input{padding:3px 7px;font-size:12px;min-width:0}
@@ -1284,7 +1280,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 }
 /* ── ≤670px высоты (1280x650 и подобные «низкие» окна) — последний шаг
       уплотнения: кнопки и отступы к минимуму, чтобы рейка помещалась целиком ── */
-@media(min-width:1024px) and (min-aspect-ratio:4/3) and (max-height:670px){
+@media(min-width:1024px) and (max-width:2559px) and (min-aspect-ratio:4/3) and (max-height:670px){
   .controls{gap:6px}
   .bet-zone{gap:6px}
   .lamp-ctrl{padding:7px}

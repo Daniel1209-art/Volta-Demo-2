@@ -1873,7 +1873,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   <div class="snd-row">
     <span class="snd-name">sound effects</span>
     <label class="toggle">
-      <input type="checkbox" class="auto-toggle-input" id="sndEnable" checked onchange="sndSetEnabled(this.checked)">
+      <input type="checkbox" class="auto-toggle-input" id="sndEnable" onchange="sndSetEnabled(this.checked)">
       <span class="tog-track"><span class="tog-knob"></span></span>
     </label>
   </div>
@@ -1999,7 +1999,7 @@ const SND = {
   names: ['lamp_on','lamp_off','bet','tick','tick_hi','round_start','cashout','crash','voltage_loop'],
   ctx: null, master: null, buf: {}, src: {}, raw: {}, ready: false,   // raw — сырые файлы до создания контекста
   autostarted: false,   // попытка автозапуска без жеста делается один раз за загрузку
-  on: true, vol: 0.8,
+  on: false, vol: 0.8,   // ПЕРВЫЙ визит — звук ВЫКЛ; при возврате localStorage ниже вернёт сохранённое
   volt: { src: null, gain: null }
 };
 try {
@@ -2248,7 +2248,7 @@ function sndAutostart(AC){
 /* ЛЮБОЕ касание/клавиша в любом месте интерфейса — и есть тот самый первый
    жест, который создаёт контекст и снимает блокировку. Игроку не нужно ничего
    «разблокировать» отдельно: тап по BET, по лампе, по фону — всё подходит. */
-const sndGesture = () => sndInit(true);
+const sndGesture = () => { if (SND.on || MUS.on) sndInit(true); };   // контекст создаём на жесте, только если звук включён
 ['pointerdown','touchstart','touchend','click','keydown'].forEach(ev => addEventListener(ev, sndGesture, { passive: true }));
 /* Возврат во вкладку: iOS приостанавливает AudioContext при сворачивании и
    входящих звонках. Музыка идёт ЧЕРЕЗ контекст, поэтому его надо будить, не
@@ -2327,7 +2327,7 @@ addEventListener('resize', () => { if ($('sndToggle') && $('sndToggle').checked)
 const MUS = {
   list: ['Lantern Drift 1','Lantern Drift 2','Volta Circuit 1','Volta Circuit 2',
          'Volta Circuit 3','Voltage Loop 1','Voltage Loop 2'],
-  el: null, on: true, track: 'Lantern Drift 1', vol: 0.5, fade: null,  // дефолт: музыка вкл, Lantern Drift 1
+  el: null, on: false, track: 'Lantern Drift 1', vol: 0.5, fade: null,  // ПЕРВЫЙ визит — музыка ВЫКЛ; возврат берёт сохранённое из localStorage
   node: null, gain: null                                              // Web Audio: источник и свой гейн
 };
 try {
@@ -2475,11 +2475,13 @@ function musResume(){ if (MUS.on && MUS.track && (!MUS.el || MUS.el.paused)) mus
   hint.addEventListener('click', dismiss);
   ['pointerdown','touchend','click','keydown'].forEach(ev =>
     addEventListener(ev, dismiss, { passive: true, once: true }));
-  /* показать подсказку, только если через 700мс звук всё ещё заблокирован */
+  /* подсказку показываем ТОЛЬКО если игрок хочет звук (тумблер вкл — обычно
+     возврат на сайт с сохранёнными настройками), но браузер его заблокировал.
+     На первом визите звук выключен по умолчанию — не навязываем «Tap for sound». */
   setTimeout(() => {
     if (done) return;
     const live = SND.ctx && SND.ctx.state === 'running';
-    if (!live) hint.hidden = false;
+    if (!live && (SND.on || MUS.on)) hint.hidden = false;
   }, 700);
 })();
 
@@ -3393,15 +3395,17 @@ try {
     else tgt.checked = !tgt.checked;
     tgt.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  /* аудио при загрузке: сэмплы эффектов тянем по сети заранее, затем ПРОБУЕМ
-     автозапуск и музыки, и эффектов там, где браузер это реально разрешает.
-     sndInit(false) создаёт контекст, проверяет по currentTime, идёт ли настоящий
-     звук, и либо принимает его (эффекты без клика), либо выбрасывает и ждёт
-     первый жест (Chrome/FF по умолчанию, немой iOS). musResume() так же пробует
-     <audio> и падает в fallback только при реальном отказе. Слушатели жестов
-     (pointerdown/touchstart/keydown) уже стоят как fallback. */
+  /* аудио при загрузке. ПЕРВЫЙ визит: SND.on/MUS.on = false (звук выключен по
+     умолчанию) — ничего не автозапускаем и контекст не создаём; игрок сам
+     включит тумблер, и этот клик разблокирует звук. ВОЗВРАТ на сайт: localStorage
+     вернул сохранённые on/vol/track — если звук был включён, ПРОБУЕМ запустить
+     сразу. sndInit(false) создаёт контекст, проверяет по currentTime, идёт ли
+     настоящий звук, и либо принимает его (эффекты без клика, где браузер
+     разрешает), либо выбрасывает и ждёт первый жест (Chrome/FF по умолчанию,
+     немой iOS). musResume() так же пробует <audio> при MUS.on. Сэмплы всё равно
+     предзагружаем — чтобы включение звука было мгновенным. */
   sndPrefetch();
-  sndInit(false);
+  if (SND.on) sndInit(false);
   musResume();
   /* раунды ведёт сервер: ждём hello/starting по WebSocket. До подключения
      кнопки погашены, чтобы нельзя было ставить в несуществующий раунд */

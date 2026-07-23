@@ -28,6 +28,13 @@ const fail = m => { console.error('ПРОВАЛ: ' + m); process.exitCode = 1; }
   const errors = [];
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 
+  /* звук по умолчанию ВЫКЛ на первом визите — тест про автозапуск, поэтому
+     эмулируем ВОЗВРАТ игрока с сохранённым «звук включён» */
+  await page.addInitScript(() => { try {
+    localStorage.setItem('volta_snd', JSON.stringify({ on: true, vol: 0.8 }));
+    localStorage.setItem('volta_mus', JSON.stringify({ on: true, track: 'Lantern Drift 1', vol: 0.5 }));
+  } catch (e) {} });
+
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2200);   // проба автозапуска (240мс) + декод, БЕЗ клика
 

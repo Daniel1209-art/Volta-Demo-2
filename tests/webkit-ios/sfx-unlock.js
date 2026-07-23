@@ -53,6 +53,12 @@ const PROBE = async (name) => {
      Ровно этот сигнал ловит currentTime-проба в sndAutostart и отбрасывает
      контекст. После жеста новый контекст ведёт себя нормально. */
   await page.addInitScript(() => {
+    /* звук по умолчанию ВЫКЛ на первом визите — а этот тест про разблокировку,
+       поэтому эмулируем ВОЗВРАТ игрока с сохранённым «звук включён» */
+    try {
+      localStorage.setItem('volta_snd', JSON.stringify({ on: true, vol: 0.8 }));
+      localStorage.setItem('volta_mus', JSON.stringify({ on: true, track: 'Lantern Drift 1', vol: 0.5 }));
+    } catch (e) {}
     let gestured = false;
     ['pointerdown','touchstart','touchend','mousedown','click','keydown'].forEach(ev =>
       addEventListener(ev, e => { if (e.isTrusted) gestured = true; }, { capture: true, passive: true }));

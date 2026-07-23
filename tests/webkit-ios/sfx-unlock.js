@@ -1,20 +1,19 @@
-/* Разблокировка звуковых ЭФФЕКТОВ первым тапом по любому месту интерфейса.
+/* Разблокировка звуковых ЭФФЕКТОВ первым тапом, когда браузер РЕАЛЬНО блокирует
+ * автозапуск — или, как iOS Safari, ВРЁТ про running при немом контексте.
  *
- * Регрессия на баг: AudioContext создавался при ЗАГРУЗКЕ страницы, вне жеста.
- * На iOS Safari такой контекст после resume() рапортует state:'running', но
- * остаётся немым — эффекты не слышны, сколько ни тапай, а музыка при этом
- * играет, потому что идёт отдельным <audio> мимо контекста. Теперь контекст
- * рождается на первом касании (sndInit(true)), а при загрузке только
- * предзагружаются сэмплы (sndPrefetch).
+ * Option B: при загрузке sndAutostart создаёт контекст и по currentTime проверяет,
+ * идут ли аудио-часы. Здесь init-скрипт ЭМУЛИРУЕТ ловушку iOS: у контекста,
+ * созданного ДО первого доверенного жеста, currentTime заморожен на 0 (ровно так
+ * немой iOS выдаёт «running»). Значит autostart ОБЯЗАН такой контекст отбросить
+ * (ctx.close), а первый тап по любому месту — создать свежий рабочий. Тест не
+ * зависит от того, как конкретная сборка Chromium трактует autoplay-флаг.
  *
- * Успех = до тапа контекста НЕТ; после ОДНОГО тапа по нейтральному месту
- * (логотип, не тумблер звука) контекст running и на шине мастера есть
- * измеримый сигнал.
+ * Успех = до тапа контекста НЕТ (проба отбросила «немой»), но сэмплы предзагружены;
+ * после ОДНОГО тапа по нейтральному месту (логотип, не тумблер) контекст running,
+ * currentTime идёт, и на шине мастера есть измеримый сигнал.
  *
- * Движок: Chromium с --autoplay-policy=user-gesture-required — это настоящая
- * политика браузера, а не заглушка. WebKit из Playwright здесь непригоден: в
- * его сборке под Windows нет window.AudioContext вообще (см. music-volume.js).
- * Поэтому финальная проверка на живом iPhone всё равно обязательна.
+ * Положительную ветку (autoplay реально разрешён → звук сразу, без тапа) держит
+ * sfx-autostart.js. Немоту именно iOS на железе проверяем только на устройстве.
  *
  *   node sfx-unlock.js
  *   TARGET=http://localhost:8105 node sfx-unlock.js
@@ -49,6 +48,24 @@ const PROBE = async (name) => {
   const errors = [];
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 
+  /* ЭМУЛЯЦИЯ НЕМОГО iOS: у AudioContext, созданного ДО первого доверенного жеста,
+     currentTime заморожен на 0 — как на iOS, где контекст «running», но глухой.
+     Ровно этот сигнал ловит currentTime-проба в sndAutostart и отбрасывает
+     контекст. После жеста новый контекст ведёт себя нормально. */
+  await page.addInitScript(() => {
+    let gestured = false;
+    ['pointerdown','touchstart','touchend','mousedown','click','keydown'].forEach(ev =>
+      addEventListener(ev, e => { if (e.isTrusted) gestured = true; }, { capture: true, passive: true }));
+    const Real = window.AudioContext || window.webkitAudioContext;
+    if (!Real) return;
+    class Trap extends Real {
+      constructor(...a){ super(...a); this.__pre = !gestured; }   // создан ли ДО жеста
+      get currentTime(){ return (this.__pre && !gestured) ? 0 : super.currentTime; }
+    }
+    window.AudioContext = Trap;
+    window.webkitAudioContext = Trap;
+  });
+
   if (!/^https:\/\/volta-demo\.com/.test(URL)) {
     const path = require('path'), fs = require('fs');
     const engine = path.join(__dirname, '..', '..', 'shared', 'engine.js');
@@ -60,16 +77,18 @@ const PROBE = async (name) => {
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
 
-  // ── 1. до жеста контекста быть не должно, но сэмплы уже скачаны
+  // ── 1. до жеста контекста быть не должно (проба отбросила «немой»), но сэмплы скачаны
   const before = await page.evaluate(() => ({
-    ctx: !!SND.ctx, ctxState: SND.ctx ? SND.ctx.state : null,
+    ctx: !!SND.ctx, ctxState: SND.ctx ? SND.ctx.state : null, autostarted: SND.autostarted,
     prefetched: SND.raw ? Object.keys(SND.raw).length : null, total: SND.names.length,
   }));
   console.log('до тапа:', JSON.stringify(before));
+  if (!before.autostarted)
+    fail('sndAutostart не запускался при загрузке — попытки автозапуска нет');
   if (before.ctx)
-    fail(`AudioContext создан ДО жеста (state:${before.ctxState}) — именно из-за этого на iOS он остаётся немым`);
+    fail(`«немой» контекст не отброшен (state:${before.ctxState}) — currentTime-проба не сработала, на iOS звук останется глухим`);
   if (before.prefetched === null)
-    fail('SND.raw отсутствует — предзагрузки сэмплов нет, значит контекст создаётся при загрузке по-старому');
+    fail('SND.raw отсутствует — предзагрузки сэмплов нет');
   else if (before.prefetched !== before.total)
     fail(`предзагружено ${before.prefetched} из ${before.total} сэмплов — к первому тапу звук будет не готов`);
 

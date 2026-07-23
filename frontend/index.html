@@ -1999,6 +1999,7 @@ const addLog = (m) => { try { console.debug('[VOLTA]', m); } catch (e) {} };
 const SND = {
   names: ['lamp_on','lamp_off','bet','tick','tick_hi','round_start','cashout','crash','voltage_loop'],
   ctx: null, master: null, buf: {}, src: {}, raw: {}, ready: false,   // raw — сырые файлы до создания контекста
+  autostarted: false,   // попытка автозапуска без жеста делается один раз за загрузку
   on: true, vol: 0.8,
   volt: { src: null, gain: null }
 };
@@ -2157,8 +2158,10 @@ function sndPrefetch(){
     } catch (e) {}
   });
 }
-/* fromGesture=true разрешает СОЗДАВАТЬ контекст. Вызовы не из жеста (загрузка
-   страницы, возврат во вкладку) могут только разбудить уже существующий. */
+/* fromGesture=true — мы внутри жеста, контекст можно создавать сразу.
+   Вызов НЕ из жеста (загрузка страницы, возврат во вкладку) сначала пробует
+   автозапуск там, где браузер его РЕАЛЬНО разрешает (sndAutostart), иначе
+   только будит уже существующий контекст. */
 function sndInit(fromGesture){
   if (SND.ctx){
     sndUnlock();                           // повторная разблокировка iOS на каждом жесте — безвредна
@@ -2171,23 +2174,14 @@ function sndInit(fromGesture){
     else musAttach();
     return;
   }
-  /* (v16) КОНТЕКСТ СОЗДАЁТСЯ ТОЛЬКО ВНУТРИ ЖЕСТА. Раньше sndInit() вызывался
-     ещё и при загрузке страницы, поэтому new AudioContext() происходил ВНЕ
-     жеста, а sndUnlock() ниже отрабатывал впустую. На iOS Safari такой
-     контекст после resume() рапортует state:'running', но остаётся немым —
-     эффекты не слышны, сколько ни тапай. Музыка при этом играет, потому что
-     идёт отдельным <audio> мимо контекста: ровно та асимметрия, что видна
-     на устройстве. Теперь при загрузке только предзагружаем файлы
-     (sndPrefetch), а контекст рождается на первом касании. */
-  if (!fromGesture) return;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
-  SND.ctx = new AC();
-  SND.master = SND.ctx.createGain();
-  SND.master.gain.value = SND.on ? SND.vol : 0;
-  SND.master.connect(SND.ctx.destination);
-  sndUnlock();                             // разблокировать iOS сразу при создании контекста в жесте
-  Promise.all(SND.names.map(async n => {
+  if (fromGesture){ sndBuildContext(new AC()); return; }
+  sndAutostart(AC);                        // не жест: попытка автозапуска с проверкой РЕАЛЬНОГО звука
+}
+/* декодируем сэмплы (из предзагруженных raw или до-фетчим) в текущий SND.ctx */
+function sndDecodeAll(){
+  return Promise.all(SND.names.map(async n => {
     try {
       /* slice(0) — decodeAudioData «съедает» ArrayBuffer, а сырые данные
          нужны целыми, если контекст придётся пересоздать */
@@ -2206,6 +2200,49 @@ function sndInit(fromGesture){
     SND.ready = true;
     if (SND.on && typeof G !== 'undefined' && G.phase === 'IN_PROGRESS') voltStart();
   });
+}
+/* принять готовый контекст как рабочий: мастер-гейн, разблокировка iOS, декод, музыка */
+function sndBuildContext(ctx){
+  SND.ctx = ctx;
+  SND.master = ctx.createGain();
+  SND.master.gain.value = SND.on ? SND.vol : 0;
+  SND.master.connect(ctx.destination);
+  sndUnlock();                             // в жесте это реально снимает iOS-блокировку
+  sndDecodeAll();
+  musAttach();                             // если контекст уже running — музыка идёт через свой гейн
+}
+/* ── АВТОЗАПУСК ЭФФЕКТОВ БЕЗ ЖЕСТА — но ТОЛЬКО там, где браузер даёт настоящий
+      звук. Ловушка iOS: контекст, созданный вне жеста, после resume() рапортует
+      state:'running', но НЕМОЙ — его аудио-часы стоят (currentTime не растёт).
+      Поэтому проверяем не state, а реально ли ИДЁТ время контекста:
+        • время пошло → autoplay разрешён (напр. Chrome с правом на звук) →
+          принимаем контекст, эффекты играют без клика;
+        • время стоит / suspended / resume отклонён → это либо обычная блокировка
+          (Chrome/FF по умолчанию), либо немой iOS — контекст ЗАКРЫВАЕМ и
+          выбрасываем, чтобы первый жест создал СВЕЖИЙ (иначе на iOS он останется
+          немым навсегда). Fallback уже висит: слушатели жестов зовут sndInit(true).
+      UA-сниффинга здесь нет — решение по факту, идёт ли звук. Поведение iOS
+      проверяемо только на живом устройстве. ── */
+function sndAutostart(AC){
+  if (SND.autostarted) return;             // одна попытка за загрузку страницы
+  SND.autostarted = true;
+  let ctx, settled = false;
+  try { ctx = new AC(); } catch (e) { return; }
+  const finish = ok => {
+    if (settled) return; settled = true;
+    if (SND.ctx){ try { ctx.close(); } catch (e) {} return; }  // жест уже создал рабочий контекст — проба лишняя
+    if (ok) sndBuildContext(ctx);          // настоящий звук — принимаем контекст
+    else try { ctx.close(); } catch (e) {} // немой/заблокирован — выбрасываем, ждём жест
+  };
+  const probe = () => {
+    if (ctx.state !== 'running'){ finish(false); return; }
+    const t0 = ctx.currentTime;
+    setTimeout(() => finish(ctx.state === 'running' && ctx.currentTime > t0 + 0.02), 240);
+  };
+  const r = ctx.resume ? ctx.resume() : null;
+  if (r && r.then) r.then(probe).catch(() => finish(false));
+  else probe();
+  setTimeout(() => finish(false), 800);    // resume() без жеста может «зависнуть» — гарантируем очистку
 }
 /* touchend и click добавлены к pointerdown/touchstart/keydown: на iOS Safari
    разблокировка аудио надёжнее всего срабатывает именно на завершении касания */
@@ -3357,12 +3394,15 @@ try {
     else tgt.checked = !tgt.checked;
     tgt.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  /* аудио при загрузке: сэмплы эффектов тянем по сети заранее (без создания
-     AudioContext — он обязан родиться внутри жеста, иначе на iOS останется
-     немым), а музыке даём попробовать стартовать сразу: где браузер разрешает
-     autoplay, она заиграет без единого клика, где запрещает — молча ждём
-     первый жест, слушатели pointerdown/touchstart/keydown уже стоят. */
+  /* аудио при загрузке: сэмплы эффектов тянем по сети заранее, затем ПРОБУЕМ
+     автозапуск и музыки, и эффектов там, где браузер это реально разрешает.
+     sndInit(false) создаёт контекст, проверяет по currentTime, идёт ли настоящий
+     звук, и либо принимает его (эффекты без клика), либо выбрасывает и ждёт
+     первый жест (Chrome/FF по умолчанию, немой iOS). musResume() так же пробует
+     <audio> и падает в fallback только при реальном отказе. Слушатели жестов
+     (pointerdown/touchstart/keydown) уже стоят как fallback. */
   sndPrefetch();
+  sndInit(false);
   musResume();
   /* раунды ведёт сервер: ждём hello/starting по WebSocket. До подключения
      кнопки погашены, чтобы нельзя было ставить в несуществующий раунд */

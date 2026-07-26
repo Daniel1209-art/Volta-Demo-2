@@ -1336,6 +1336,73 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 .ph-win{color:var(--g);font-weight:700}
 .ph-lost{color:var(--r);font-weight:700}
 
+/* ═══ МЕНЮ: вкладки My Bets / Provably Fair (в модалке #profToggle) ═══ */
+.menu-box{max-width:min(94vw,520px)}
+/* padding-right резервирует место под плавающей кнопкой × (top/right:12px) */
+.menu-tabs{display:flex;gap:6px;margin:2px 0 14px;padding-right:30px}
+.menu-tab{flex:1;text-align:center;padding:8px 8px;border-radius:var(--rad-sm);cursor:pointer;
+  font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--s2);border:1px solid var(--brd);user-select:none;transition:background .15s,color .15s,border-color .15s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.menu-tab:hover{color:var(--t2)}
+.menu-pane{display:none}
+#mtBets:checked ~ #paneBets{display:block}
+#mtPF:checked ~ #panePF{display:block}
+#mtBets:checked ~ .menu-tabs .menu-tab[for="mtBets"],
+#mtPF:checked ~ .menu-tabs .menu-tab[for="mtPF"]{color:var(--gold);background:var(--p3);border-color:var(--brd2)}
+.menu-tab:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+/* ── Provably Fair pane ── */
+.pf-intro{font-size:11.5px;color:var(--t2);line-height:1.7}
+.pf-intro h3{font-size:10px;color:var(--txt);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 5px;font-weight:700}
+.pf-intro h3:first-child{margin-top:0}
+.pf-intro p{margin-bottom:5px}
+.pf-intro ol{margin:5px 0 5px 17px;padding:0}
+.pf-intro li{margin-bottom:5px}
+.pf-intro code{font-family:monospace;font-size:10.5px;color:var(--gold);background:var(--s2);padding:1px 5px;border-radius:3px}
+.pf-mine{margin:12px 0 2px;padding:10px 12px;background:var(--s2);border:1px solid var(--brd2);border-radius:var(--rad-sm)}
+.pf-mine-lbl{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:5px}
+.pf-seedrow{display:flex;align-items:center;gap:6px}
+.pf-seed{font-family:monospace;font-size:11px;color:var(--gold);word-break:break-all;flex:1;min-width:0}
+.pf-rounds{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.pf-round{border:1px solid var(--brd);border-radius:var(--rad-sm);background:var(--s2);overflow:hidden}
+.pf-rhead{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;
+  padding:8px 10px;cursor:pointer;user-select:none;font-size:11px;font-variant-numeric:tabular-nums}
+.pf-rhead:hover{background:var(--p3)}
+.pf-rid{color:var(--t3);font-weight:700}
+.pf-rtime{color:var(--t3);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-rmult{font-weight:800;color:var(--gold)}
+.pf-rchev{color:var(--t3);transition:transform .15s}
+.pf-round.open .pf-rchev{transform:rotate(90deg)}
+.pf-rbody{display:none;padding:2px 10px 10px}
+.pf-round.open .pf-rbody{display:block}
+.pf-field{margin-top:9px}
+.pf-flabel{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:3px}
+.pf-val{font-family:monospace;font-size:10px;color:var(--t2);word-break:break-all;
+  background:var(--s1);border:1px solid var(--brd);border-radius:4px;padding:5px 7px;
+  display:flex;align-items:flex-start;gap:6px}
+.pf-val span{flex:1;min-width:0}
+.pf-seedlist{display:flex;flex-direction:column;gap:4px}
+.pf-seedrow2{display:flex;align-items:center;gap:6px}
+.pf-seedrow2 .pf-val{flex:1;min-width:0}
+.pf-tag{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 6px;border-radius:3px;flex-shrink:0;align-self:center}
+.pf-tag.real{background:var(--p3);color:var(--p)}
+.pf-tag.sys{background:var(--r2);color:var(--r)}
+.pf-verify{margin-top:11px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pf-vbtn{padding:7px 16px;border-radius:var(--rad-sm);border:1px solid var(--brd2);background:var(--p3);
+  color:var(--p);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.pf-vbtn:hover{background:var(--p);color:#fff}
+.pf-vres{font-size:11px;font-weight:700}
+.pf-vres .pf-ok{color:var(--g)} .pf-vres .pf-bad{color:var(--r)}
+.pf-more{width:100%;margin-top:12px;padding:9px;border-radius:var(--rad-sm);border:1px solid var(--brd);
+  background:var(--s2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+  letter-spacing:.05em;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.pf-more:hover{background:var(--p3);color:var(--gold)}
+.pf-more[hidden]{display:none}
+
 </style>
 </head>
 <body>
@@ -1423,6 +1490,11 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
           <rect x="1" y="6" width="3.6" height="9" rx="1"/>
           <rect x="6.2" y="2" width="3.6" height="13" rx="1"/>
           <rect x="11.4" y="9" width="3.6" height="6" rx="1"/>
+        </svg>
+      </label>
+      <label class="info-btn" for="profToggle" role="button" aria-label="Menu — My Bets & Provably Fair" onclick="profOpen()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke-linecap="round"/>
         </svg>
       </label>
       <label class="info-btn" for="infoToggle" role="button" aria-label="How to play">i</label>
@@ -1832,10 +1904,12 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
     <div class="lb-handle"></div>
     <label class="lb-close" for="lbToggle" role="button" aria-label="Close leaderboard">&#215;</label>
     <!-- ПРОФИЛЬ: ник игрока (выдаёт сервер) — клик открывает «My Game History» -->
-    <label class="prof-btn" for="profToggle" role="button" aria-label="My game history" onclick="profOpen()">
+    <label class="prof-btn" for="profToggle" role="button" aria-label="Menu — My Bets & Provably Fair" onclick="profOpen()">
       <span class="prof-ava" id="profAva">V</span>
       <span class="prof-nick" id="profNick">connecting&#8230;</span>
-      <span class="prof-hint">My Bets</span>
+      <span class="prof-hint" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke-linecap="round"/></svg>
+      </span>
     </label>
     <div class="lb-title">
       <span class="lb-title-dot" id="lbPhaseDot"></span>
@@ -1932,13 +2006,49 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   </div>
 </div>
 
-<!-- MY GAME HISTORY — ставки игрока за сегодня (данные с сервера, сброс раз в сутки) -->
+<!-- МЕНЮ: две вкладки — My Bets (ставки игрока за сегодня) и Provably Fair -->
 <div class="prof-overlay">
   <label class="modal-backdrop" for="profToggle" aria-label="Close"></label>
-  <div class="modal-box">
+  <div class="modal-box menu-box">
     <label class="modal-close" for="profToggle" role="button" aria-label="Close">&#215;</label>
-    <div class="modal-title">My Bets</div>
-    <div class="modal-body" id="profHistBody"><p style="color:var(--t3)">Loading&#8230;</p></div>
+    <input type="radio" name="menuTab" id="mtBets" class="vis-toggle" checked aria-hidden="true">
+    <input type="radio" name="menuTab" id="mtPF" class="vis-toggle" aria-hidden="true">
+    <div class="menu-tabs" role="tablist">
+      <label class="menu-tab" for="mtBets" role="tab" tabindex="0">My Bets</label>
+      <label class="menu-tab" for="mtPF" role="tab" tabindex="0" onclick="pfOpen()">Provably Fair</label>
+    </div>
+
+    <!-- ВКЛАДКА 1 — My Bets (прежний функционал) -->
+    <div class="menu-pane" id="paneBets">
+      <div class="modal-body" id="profHistBody"><p style="color:var(--t3)">Loading&#8230;</p></div>
+    </div>
+
+    <!-- ВКЛАДКА 2 — Provably Fair -->
+    <div class="menu-pane" id="panePF">
+      <div class="pf-intro">
+        <h3>What is Provably Fair?</h3>
+        <p>Every round's outcome is fixed <b>before</b> you bet and can be checked by anyone afterwards — the game cannot change a result once bets are open.</p>
+        <ol>
+          <li>The server picks a secret <b>server seed</b> and publishes only its SHA-256 <b>hash</b> before the round (that's the <code>round hash</code> under the BET button).</li>
+          <li>While bets are open, the <b>client seed</b> is gathered from the real players of this round — up to 5 of them, ordered by the committed server seed. If nobody bet, a single fixed <b>system seed</b> is used instead (shown honestly as a one-layer round).</li>
+          <li>When the round ends, the server reveals the server seed and all client seeds used.</li>
+        </ol>
+        <h3>Check the round hash</h3>
+        <p>Take the revealed server seed, compute its SHA-256 yourself (the <b>Verify</b> button below does it in your browser with <code>crypto.subtle</code>), and compare it to the hash shown before the round. They must match.</p>
+        <h3>Check the multiplier</h3>
+        <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. The first 13 hex digits of that HMAC are turned into the multiplier by Bustabit's formula (a 1-in-40 chance of an instant ×1.00, otherwise <code>floor((100·2^52 − h) / (2^52 − h))/100</code>). Verify recomputes this locally and compares — no third-party site needed.</p>
+        <div class="pf-mine">
+          <div class="pf-mine-lbl">Your client seed</div>
+          <div class="pf-seedrow">
+            <span class="pf-seed" id="pfMySeed">&#8230;</span>
+            <button type="button" class="seed-copy" aria-label="Copy your client seed" title="Copy" onclick="copyText(NET.clientSeed, this)">&#10697;</button>
+          </div>
+        </div>
+        <h3>Recent rounds</h3>
+      </div>
+      <div class="pf-rounds" id="pfRounds"><p style="color:var(--t3);font-size:11px">Loading rounds&#8230;</p></div>
+      <button type="button" class="pf-more" id="pfMore" hidden onclick="pfMore()">Load older rounds</button>
+    </div>
   </div>
 </div>
 
@@ -1971,7 +2081,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 /* ── SHARED ENGINE — общий модуль клиента и сервера ────────────────── */
 const { TICK_RATE, AFTER_CRASH_MS, RESTART_MS, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
         growthFunc, inverseGrowth, crashPointFromHash, sha256hex, randHex,
-        combineClientSeeds } = window.VoltaEngine;
+        combineClientSeeds, divisible } = window.VoltaEngine;
 /* ── STATE ────────────────────────────────────────────────────────── */
 const G = {
   bal: 10000, round: 0, phase: 'ENDED',
@@ -3313,6 +3423,7 @@ function onNetMsg(m){
       break;
     }
     case 'myhistory': renderMyHistory(m); break;
+    case 'pf': renderPF(m); break;
   }
 }
 
@@ -3424,6 +3535,85 @@ function renderMyHistory(m){
     <div class="ph-head"><span>round</span><span>bet</span><span>exit ×</span><span>result</span><span>payout</span></div>
     ${rows}
     <p style="color:var(--t3);font-size:10px;margin-top:10px">Today only (${m.day}, ${m.tz}) · resets daily · survives reconnects.</p>`;
+}
+
+/* ── PROVABLY FAIR: история раундов + независимая проверка в браузере ─── */
+const PF = { rows: [], limit: 20 };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function pfOpen(){
+  const my = $('pfMySeed'); if (my) my.textContent = NET.clientSeed;
+  PF.limit = 20;
+  const box = $('pfRounds'); if (box) box.innerHTML = '<p style="color:var(--t3);font-size:11px">Loading rounds…</p>';
+  netSend({ t: 'pf', limit: PF.limit });
+}
+function pfMore(){ PF.limit = Math.min(50, PF.limit + 20); netSend({ t: 'pf', limit: PF.limit }); }
+
+/* маленькая копирующая кнопка для значения */
+function pfCopyBtn(val){
+  return `<button type="button" class="seed-copy" aria-label="Copy" title="Copy" onclick="copyText('${esc(val)}', this)">⧉</button>`;
+}
+function renderPF(m){
+  PF.rows = m.rows || [];
+  const box = $('pfRounds'); if (!box) return;
+  if (!PF.rows.length){ box.innerHTML = '<p style="color:var(--t3);font-size:11px">No finished rounds yet.</p>'; return; }
+  box.innerHTML = PF.rows.map((r, i) => {
+    const mult = (r.crashPoint === 0 ? 1.0 : r.crashPoint / 100).toFixed(2);
+    const time = new Date(r.crashedAt).toLocaleTimeString();
+    const seedRows = (r.clientSeeds || []).map(s => {
+      const sys = r.seedMode === 'single';
+      return `<div class="pf-seedrow2"><span class="pf-tag ${sys ? 'sys' : 'real'}">${sys ? 'system' : 'player'}</span>`
+        + `<div class="pf-val"><span>${esc(s)}</span>${pfCopyBtn(s)}</div></div>`;
+    }).join('');
+    return `<div class="pf-round" id="pfR${i}">
+      <div class="pf-rhead" onclick="pfToggle(${i})">
+        <span class="pf-rid">#${r.roundId}</span>
+        <span class="pf-rtime">${time}</span>
+        <span class="pf-rmult">×${mult}</span>
+        <span class="pf-rchev">›</span>
+      </div>
+      <div class="pf-rbody">
+        <div class="pf-field"><div class="pf-flabel">Round hash (published before round)</div>
+          <div class="pf-val"><span>${esc(r.hash)}</span>${pfCopyBtn(r.hash)}</div></div>
+        <div class="pf-field"><div class="pf-flabel">Server seed (revealed after crash)</div>
+          <div class="pf-val"><span>${esc(r.serverSeed)}</span>${pfCopyBtn(r.serverSeed)}</div></div>
+        <div class="pf-field"><div class="pf-flabel">Client seeds${r.seedMode === 'single' ? ' — one-layer round (no real bets)' : ' — real players of the round'}</div>
+          <div class="pf-seedlist">${seedRows}</div></div>
+        <div class="pf-verify">
+          <button type="button" class="pf-vbtn" onclick="verifyRound(${i})">Verify</button>
+          <span class="pf-vres" id="pfV${i}"></span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  const more = $('pfMore'); if (more) more.hidden = PF.rows.length < PF.limit;
+}
+function pfToggle(i){ const el = $('pfR' + i); if (el) el.classList.toggle('open'); }
+
+/* независимый пересчёт: SHA-256 и HMAC-SHA256 через crypto.subtle (не движок),
+   затем множитель по той же формуле — доказывает и hash, и crash-point */
+const _hexb = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+function crashFromHmacHex(hash){
+  if (divisible(hash, 40)) return 0;
+  const h = parseInt(hash.slice(0, 13), 16), e = Math.pow(2, 52);
+  return Math.floor((100 * e - h) / (e - h));
+}
+async function verifyRound(i){
+  const r = PF.rows[i]; const out = $('pfV' + i); if (!r || !out) return;
+  out.innerHTML = '<span style="color:var(--t3)">checking…</span>';
+  try {
+    const enc = new TextEncoder();
+    const dig = await crypto.subtle.digest('SHA-256', enc.encode(r.serverSeed));
+    const hashOK = _hexb(dig) === r.hash;
+    const key = await crypto.subtle.importKey('raw', enc.encode(r.serverSeed),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(combineClientSeeds(r.clientSeeds)));
+    const crashOK = crashFromHmacHex(_hexb(sig)) === r.crashPoint;
+    const tag = (ok, label) => `<span class="${ok ? 'pf-ok' : 'pf-bad'}">${ok ? '✓' : '✗'} ${label} ${ok ? 'Match' : 'Mismatch'}</span>`;
+    out.innerHTML = tag(hashOK, 'hash') + ' · ' + tag(crashOK, 'multiplier');
+  } catch (e) {
+    out.innerHTML = '<span class="pf-bad">crypto.subtle unavailable (needs HTTPS)</span>';
+  }
 }
 
 /* ── BOOT ─────────────────────────────────────────────────────────── */

@@ -104,12 +104,39 @@
   const _enc = new TextEncoder();
   const _hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
 
-  function crashPointFromHash(serverSeed){
-    const hash = _hex(_hmac(_enc.encode(serverSeed), _enc.encode(CLIENT_SEED)));
+  /* Crash-point из HMAC-SHA256. КЛЮЧ — секретный serverSeed (зафиксирован
+     хэшем до раунда), СООБЩЕНИЕ — client seed. Формула (divisible + деление)
+     НЕ менялась: она проаудирована. Изменился только ИСТОЧНИК client seed —
+     раньше это была одна зашитая константа CLIENT_SEED, теперь передаётся
+     склейка seed-ов реальных игроков раунда (см. combineClientSeeds). При
+     отсутствии аргумента поведение прежнее (константа) — обратная совместимость.
+     RTP не зависит от client seed: при случайном serverSeed выход HMAC
+     равномерен для любого фиксированного сообщения. */
+  function crashPointFromHash(serverSeed, clientSeed){
+    const cs = clientSeed == null ? CLIENT_SEED : clientSeed;
+    const hash = _hex(_hmac(_enc.encode(serverSeed), _enc.encode(cs)));
     if (divisible(hash, 40)) return 0;
     const h = parseInt(hash.slice(0, 13), 16), e = Math.pow(2, 52);
     return Math.floor((100 * e - h) / (e - h));
   }
+
+  /* Детерминированный порядок client seed-ов, выведенный из уже
+     ЗАФИКСИРОВАННОГО serverSeed. Для игрока он «случайный» (до краша игрок
+     видит только sha256(serverSeed)), но сервер его НЕ может грайндить —
+     serverSeed связан хэш-commit'ом. Порядок полностью воспроизводим кнопкой
+     Verify. Fisher–Yates, индекс шага берётся из sha256(serverSeed|i). */
+  function orderBySeed(seeds, serverSeed){
+    const a = seeds.slice();
+    for (let i = a.length - 1; i > 0; i--){
+      const h = _hex(_sha256(_enc.encode(serverSeed + '|' + i)));
+      const j = parseInt(h.slice(0, 8), 16) % (i + 1);
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  /* Склейка упорядоченных client seed-ов в одно сообщение HMAC. Разделитель
+     '-' фиксирован, чтобы серверный расчёт и клиентская проверка совпадали. */
+  function combineClientSeeds(seeds){ return seeds.join('-'); }
   function sha256hex(msg){ return _hex(_sha256(_enc.encode(msg))); }
   function randHex(n = 16){
     const b = new Uint8Array(n);
@@ -122,6 +149,9 @@
   return {
     TICK_RATE, AFTER_CRASH_MS, RESTART_MS, CLIENT_SEED, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
     R1, T0, R0, MJOIN,
+    SYSTEM_SEED: CLIENT_SEED,   // системный seed для однослойной схемы (0 реальных игроков)
+    MAX_SEEDS: 5,               // максимум client seed-ов от реальных игроков в раунде
     growthFunc, inverseGrowth, divisible, crashPointFromHash, sha256hex, randHex,
+    orderBySeed, combineClientSeeds,
   };
 });

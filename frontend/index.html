@@ -1944,7 +1944,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   </div>
 </div>
 
-<script src="shared/engine.js"></script>
+<script src="shared/engine.js?v=2"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    VOLTA — LAMP GAME CLIENT  (Bustabit-accurate math, provably fair)
@@ -1959,11 +1959,13 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 
 /* ── SHARED ENGINE — общий модуль клиента и сервера ────────────────── */
 const { TICK_RATE, AFTER_CRASH_MS, RESTART_MS, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
-        growthFunc, inverseGrowth, crashPointFromHash, sha256hex, randHex } = window.VoltaEngine;
+        growthFunc, inverseGrowth, crashPointFromHash, sha256hex, randHex,
+        combineClientSeeds } = window.VoltaEngine;
 /* ── STATE ────────────────────────────────────────────────────────── */
 const G = {
   bal: 10000, round: 0, phase: 'ENDED',
   serverSeed: null, hash: null, crashPoint: null, gameDuration: null, startTime: null,
+  clientSeeds: null, seedMode: null,   // раскрытые client seed-ы раунда (приходят в 'crash')
   bet: null, lampOn: false, lampEver: false,
   switchesLeft: MAX_SWITCHES, switchesUsed: 0,
   persOnEntry: 1.0, persAccum: 1.0,
@@ -2836,6 +2838,7 @@ function prepRound(msg){
   G.serverSeed = null;
   G.hash       = msg.hash;
   G.crashPoint = null;
+  G.clientSeeds = null; G.seedMode = null;
 
   G.bet = null; G.lampOn = false; G.lampEver = false;
   G.switchesLeft = MAX_SWITCHES; G.switchesUsed = 0;
@@ -3182,6 +3185,17 @@ const NET = {
       return id;
     } catch (e) { return randHex(16); }
   })(),
+  /* персональный provably-fair CLIENT SEED игрока: генерится в браузере при
+     первом заходе, хранится в localStorage, шлётся серверу с hello. Игрок им
+     владеет и видит его в разделе Provably Fair. Сервер склеивает seed-ы
+     реальных игроков раунда → это второй слой (кроме серверного) в HMAC. */
+  clientSeed: (() => {
+    try {
+      let s = localStorage.getItem('volta_cseed');
+      if (!/^[a-f0-9]{8,64}$/.test(s || '')){ s = randHex(8); localStorage.setItem('volta_cseed', s); }
+      return s;
+    } catch (e) { return randHex(8); }
+  })(),
 };
 const srv2loc = ts => ts - NET.offset;         // серверная метка времени → локальные часы
 
@@ -3193,7 +3207,7 @@ function netConnect(){
   NET.ws = ws;
   ws.onopen = () => {
     NET.tries = 0; NET.bestRtt = Infinity;
-    netSend({ t: 'hello', clientId: NET.clientId });
+    netSend({ t: 'hello', clientId: NET.clientId, clientSeed: NET.clientSeed });
     netPing();
   };
   ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } onNetMsg(m); };
@@ -3317,13 +3331,17 @@ function applyHello(m){
 }
 
 function onCrash(m){
-  G.crashPoint = m.crashPoint;
-  G.serverSeed = m.serverSeed;
-  /* provably fair: раскрытый seed обязан дать хэш, объявленный ДО раунда,
-     и ровно этот crash-point — клиент проверяет сам, той же математикой */
+  G.crashPoint  = m.crashPoint;
+  G.serverSeed  = m.serverSeed;
+  G.clientSeeds = m.clientSeeds || null;
+  G.seedMode    = m.seedMode || null;
+  /* provably fair: раскрытый seed обязан дать хэш, объявленный ДО раунда, и
+     ровно этот crash-point из HMAC(serverSeed, склейка client seed-ов раунда) —
+     клиент проверяет сам, той же математикой */
   if (G.hash){
+    const combined = m.clientSeeds ? combineClientSeeds(m.clientSeeds) : undefined;
     const okH = sha256hex(m.serverSeed) === G.hash;
-    const okC = crashPointFromHash(m.serverSeed) === m.crashPoint;
+    const okC = crashPointFromHash(m.serverSeed, combined) === m.crashPoint;
     addLog(`provably fair #${m.roundId}: hash ${okH ? 'OK' : 'MISMATCH!'} · crash ${okC ? 'OK' : 'MISMATCH!'}`);
   }
   for (const sp of (m.players || [])){         // серверные итоги остальных игроков

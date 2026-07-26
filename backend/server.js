@@ -56,11 +56,13 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS rounds (
-    round_id    INTEGER PRIMARY KEY,
-    hash        TEXT NOT NULL,
-    seed        TEXT NOT NULL,
-    crash_point INTEGER NOT NULL,
-    crashed_at  INTEGER NOT NULL
+    round_id     INTEGER PRIMARY KEY,
+    hash         TEXT NOT NULL,
+    seed         TEXT NOT NULL,
+    crash_point  INTEGER NOT NULL,
+    crashed_at   INTEGER NOT NULL,
+    client_seeds TEXT,               -- JSON-массив использованных client seed-ов раунда
+    seed_mode    TEXT                -- 'multi' (реальные игроки) | 'single' (системный seed)
   );
   CREATE TABLE IF NOT EXISTS bets (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,12 +77,19 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS bets_player_day ON bets(player_id, day);
 `);
+/* миграция: у ранее созданной таблицы rounds могло не быть столбцов PF */
+{
+  const cols = db.prepare('PRAGMA table_info(rounds)').all().map(c => c.name);
+  if (!cols.includes('client_seeds')) db.exec('ALTER TABLE rounds ADD COLUMN client_seeds TEXT');
+  if (!cols.includes('seed_mode'))    db.exec('ALTER TABLE rounds ADD COLUMN seed_mode TEXT');
+}
 const q = {
   getPlayer:  db.prepare('SELECT id, nick FROM players WHERE id = ?'),
   nickTaken:  db.prepare('SELECT 1 FROM players WHERE nick = ?'),
   addPlayer:  db.prepare('INSERT INTO players (id, nick, created_at) VALUES (?, ?, ?)'),
-  addRound:   db.prepare('INSERT INTO rounds (round_id, hash, seed, crash_point, crashed_at) VALUES (?, ?, ?, ?, ?)'),
+  addRound:   db.prepare('INSERT INTO rounds (round_id, hash, seed, crash_point, crashed_at, client_seeds, seed_mode) VALUES (?, ?, ?, ?, ?, ?, ?)'),
   lastRounds: db.prepare('SELECT round_id, crash_point FROM rounds ORDER BY round_id DESC LIMIT ?'),
+  pfRounds:   db.prepare('SELECT round_id, hash, seed, crash_point, crashed_at, client_seeds, seed_mode FROM rounds ORDER BY round_id DESC LIMIT ?'),
   maxRound:   db.prepare('SELECT COALESCE(MAX(round_id), 0) AS m FROM rounds'),
   addBet:     db.prepare('INSERT INTO bets (player_id, round_id, day, amount, final_mult, win, payout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
   myBetsDay:  db.prepare('SELECT round_id, amount, final_mult, win, payout, created_at FROM bets WHERE player_id = ? AND day = ? ORDER BY id DESC LIMIT 200'),
@@ -115,6 +124,8 @@ const R = {
   phase: 'ENDED',            // STARTING | IN_PROGRESS | ENDED
   roundId: q.maxRound.get().m,
   serverSeed: null, hash: null, crashPoint: null, gameDuration: null,
+  clientSeeds: null,         // упорядоченные client seed-ы раунда (задаются при закрытии окна ставок)
+  seedMode: null,            // 'multi' (реальные игроки) | 'single' (системный seed)
   startsAt: 0, startTime: 0, endedAt: 0,
   bots: [],                  // заполнители стола: пороги детерминируют поведение
   timer: null,
@@ -130,6 +141,7 @@ let history = q.lastRounds.all(HISTORY_LEN)
 const players = new Map();   // clientId → P
 function P(id, nick){
   return { id, nick, sockets: new Set(),
+           clientSeed: null,          // персональный provably-fair seed игрока (приходит с клиента)
            bet: null, lampOn: false, lampEver: false,
            switchesLeft: E.MAX_SWITCHES, persAccum: 1.0, persOnEntry: 1.0,
            settled: false, win: null, finalMult: null };
@@ -190,9 +202,15 @@ function prepRound(){
   R.roundId++;
   R.phase = 'STARTING';
   R.serverSeed   = E.randHex(32);                       // crypto-стойкий rand (webcrypto Node)
-  R.hash         = E.sha256hex(R.serverSeed);           // публикуется ДО раунда
-  R.crashPoint   = E.crashPointFromHash(R.serverSeed);  // остаётся ТОЛЬКО на сервере до краша
-  R.gameDuration = R.crashPoint === 0 ? 0 : Math.ceil(E.inverseGrowth(R.crashPoint + 1));
+  R.hash         = E.sha256hex(R.serverSeed);           // публикуется ДО раунда (commit)
+  /* crash-point ЗДЕСЬ ещё НЕ считаем: client seed соберём от реальных ставок,
+     пришедших за окно ставок, и вычислим crash-point при его ЗАКРЫТИИ
+     (startRound). serverSeed уже зафиксирован хэшем — сервер не может
+     подобрать его под ещё не существующие client seed-ы. */
+  R.crashPoint   = null;
+  R.gameDuration = null;
+  R.clientSeeds  = null;
+  R.seedMode     = null;
   R.startsAt     = Date.now() + E.RESTART_MS;
   R.bots         = spawnBots();
   for (const p of players.values()) resetPlayerRound(p);
@@ -208,11 +226,33 @@ function prepRound(){
 function startRound(){
   R.phase = 'IN_PROGRESS';
   R.startTime = Date.now();
+
+  /* ── ОКНО СТАВОК ЗАКРЫТО → формируем client seed раунда ───────────────
+     Берём seed-ы ТОЛЬКО реальных игроков, реально поставивших ставку
+     (боты — визуальная лента, в математику не входят). Порядок выводим
+     из уже зафиксированного serverSeed (случайный для игрока, не грайндибелен
+     сервером, воспроизводим Verify). До 5 seed-ов. Если реальных ставок нет —
+     однослойная схема: serverSeed + системный seed (UI покажет это честно). */
+  const realSeeds = [...players.values()]
+    .filter(p => p.bet && p.clientSeed)
+    .map(p => p.clientSeed);
+  if (realSeeds.length === 0){
+    R.seedMode    = 'single';
+    R.clientSeeds = [E.SYSTEM_SEED];
+  } else {
+    R.seedMode    = 'multi';
+    R.clientSeeds = E.orderBySeed(realSeeds, R.serverSeed).slice(0, E.MAX_SEEDS);
+  }
+  const combined = E.combineClientSeeds(R.clientSeeds);
+  R.crashPoint   = E.crashPointFromHash(R.serverSeed, combined);   // только на сервере до краша
+  R.gameDuration = R.crashPoint === 0 ? 0 : Math.ceil(E.inverseGrowth(R.crashPoint + 1));
+
   /* free start ON — как у клиента: не тратит переключение */
   for (const p of players.values()){
     if (p.bet){ p.lampOn = true; p.lampEver = true; p.persOnEntry = 1.0; p.persAccum = 1.0; }
   }
   broadcast({ t: 'started', roundId: R.roundId, startTime: R.startTime, serverNow: Date.now() });
+  console.log(`[round ${R.roundId}] seed mode ${R.seedMode}, ${R.clientSeeds.length} client seed(s)`);
 
   clearTimeout(R.timer);
   R.timer = setTimeout(crashRound, Math.max(0, R.gameDuration));
@@ -243,13 +283,16 @@ function crashRound(){
     q.addBet.run(p.id, R.roundId, today, p.bet, p.finalMult, p.win ? 1 : 0, payout, Date.now());
   }
 
-  q.addRound.run(R.roundId, R.hash, R.serverSeed, R.crashPoint, R.endedAt);
+  q.addRound.run(R.roundId, R.hash, R.serverSeed, R.crashPoint, R.endedAt,
+                 JSON.stringify(R.clientSeeds || []), R.seedMode || 'single');
   history.unshift({ roundId: R.roundId, m: crashMult });
   history = history.slice(0, HISTORY_LEN);
 
-  /* seed раскрывается только сейчас — клиенты сверяют sha256(seed) с хэшем раунда */
+  /* seed раскрывается только сейчас — клиенты сверяют sha256(seed) с хэшем раунда
+     и crash-point = crashPointFromHash(seed, склейка client seed-ов) */
   broadcast({ t: 'crash', roundId: R.roundId, crashPoint: R.crashPoint,
-              serverSeed: R.serverSeed, serverNow: Date.now(),
+              serverSeed: R.serverSeed, clientSeeds: R.clientSeeds, seedMode: R.seedMode,
+              serverNow: Date.now(),
               players: [...players.values()].filter(p => p.bet).map(pubPlayer) });
   console.log(`[round ${R.roundId}] crash ×${crashMult.toFixed(2)}`);
 
@@ -291,6 +334,26 @@ function handleMyHistory(p, ws){
     roundId: r.round_id, amount: r.amount, finalMult: r.final_mult,
     win: !!r.win, payout: r.payout, at: r.created_at }));
   send(ws, { t: 'myhistory', day, tz: RESET_TZ, rows });
+}
+
+/* client seed игрока: только «безопасные» символы, ограниченная длина */
+function sanitizeSeed(s){
+  if (typeof s !== 'string') return null;
+  const clean = s.replace(/[^a-zA-Z0-9]/g, '').slice(0, 64);
+  return clean.length >= 4 ? clean : null;
+}
+
+/* Provably Fair: последние завершённые раунды с полным набором для проверки */
+function handlePF(ws, limit){
+  const n = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+  const rows = q.pfRounds.all(n).map(r => {
+    let seeds = [];
+    try { seeds = JSON.parse(r.client_seeds || '[]'); } catch (e) { seeds = []; }
+    return { roundId: r.round_id, hash: r.hash, serverSeed: r.seed,
+             crashPoint: r.crash_point, crashedAt: r.crashed_at,
+             clientSeeds: seeds, seedMode: r.seed_mode || 'single' };
+  });
+  send(ws, { t: 'pf', rows });
 }
 
 /* ── СУТОЧНЫЙ СБРОС + ЧИСТКА ──────────────────────────────────────────
@@ -354,12 +417,17 @@ wss.on('connection', (ws) => {
       me = players.get(clientId);
       if (!me){ me = P(clientId, rec.nick); players.set(clientId, me); }
       me.sockets.add(ws);
+      me.clientSeed = sanitizeSeed(msg.clientSeed);   // персональный provably-fair seed игрока
       ws.clientId = clientId;
+      const ended = R.phase === 'ENDED';
       send(ws, {
         t: 'hello', serverNow: Date.now(), nick: me.nick,
         phase: R.phase, roundId: R.roundId, hash: R.hash,
         startsAt: R.startsAt, startTime: R.startTime, endedAt: R.endedAt,
-        crashPoint: R.phase === 'ENDED' ? R.crashPoint : null,   // до краша crash-point не покидает сервер
+        crashPoint:  ended ? R.crashPoint  : null,   // до краша crash-point не покидает сервер
+        serverSeed:  ended ? R.serverSeed  : null,   // раскрытый seed последнего завершённого раунда
+        clientSeeds: ended ? R.clientSeeds : null,
+        seedMode:    ended ? R.seedMode    : null,
         history: history.map(h => h.m),
         bots: R.bots,
         players: [...players.values()].filter(p => p.bet && p.id !== clientId).map(pubPlayer),
@@ -372,6 +440,8 @@ wss.on('connection', (ws) => {
     if (msg.t === 'bet')       handleBet(me, msg.amount);
     else if (msg.t === 'lamp') handleLamp(me, !!msg.on, msg.mult);
     else if (msg.t === 'myhistory') handleMyHistory(me, ws);
+    else if (msg.t === 'seed')      me.clientSeed = sanitizeSeed(msg.clientSeed);   // игрок сменил client seed
+    else if (msg.t === 'pf')        handlePF(ws, msg.limit);
   });
 
   ws.on('close', () => {

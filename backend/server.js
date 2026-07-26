@@ -347,8 +347,17 @@ function sanitizeSeed(s){
 function handlePF(ws, limit){
   const n = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
   const rows = q.pfRounds.all(n).map(r => {
+    /* legacy-раунды (записаны ДО миграции) не имеют client_seeds: тогда
+       использовался системный seed как единственный client seed — отдаём его,
+       чтобы независимый пересчёт множителя сходился и на старой истории. */
+    if (r.client_seeds == null){
+      return { roundId: r.round_id, hash: r.hash, serverSeed: r.seed,
+               crashPoint: r.crash_point, crashedAt: r.crashed_at,
+               clientSeeds: [E.SYSTEM_SEED], seedMode: 'single' };
+    }
     let seeds = [];
-    try { seeds = JSON.parse(r.client_seeds || '[]'); } catch (e) { seeds = []; }
+    try { seeds = JSON.parse(r.client_seeds); } catch (e) { seeds = []; }
+    if (!seeds.length) seeds = [E.SYSTEM_SEED];
     return { roundId: r.round_id, hash: r.hash, serverSeed: r.seed,
              crashPoint: r.crash_point, crashedAt: r.crashed_at,
              clientSeeds: seeds, seedMode: r.seed_mode || 'single' };

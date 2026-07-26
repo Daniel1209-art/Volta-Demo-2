@@ -572,6 +572,17 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .bet-note{font-size:9px;color:var(--t3);margin-top:8px;line-height:1.4;
   font-variant-numeric:tabular-nums;letter-spacing:.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+/* round hash под BET: клик по значению разворачивает полный публичный хэш,
+   кнопка справа копирует его. В развёрнутом виде строка переносится. */
+.bet-note.hash-open{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-all}
+.bet-note .seed-val{color:var(--p);font-weight:700;cursor:pointer;border-bottom:1px dotted var(--brd2)}
+.bet-note .seed-val:hover{color:var(--gold)}
+.seed-copy{display:inline-flex;align-items:center;justify-content:center;vertical-align:-3px;
+  margin-left:5px;width:18px;height:18px;padding:0;border-radius:4px;border:1px solid var(--brd2);
+  background:var(--p3);color:var(--p);font-size:11px;line-height:1;cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s,transform .1s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.seed-copy:hover{background:var(--p);color:#fff}
+.seed-copy:active{transform:scale(.88)}
 
 /* real autopilot master toggle (replaces the static green chip) */
 .toggle .auto-toggle-input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
@@ -2859,7 +2870,8 @@ function prepRound(msg){
 
   const bb = $('betBtn');
   bb.disabled = false; bb.classList.remove('placed'); bb.textContent = 'BET';
-  $('betNote').innerHTML = `seed: <b style="color:var(--p)">${G.hash.slice(0, 10)}…</b> · bets open`;
+  $('betNote').classList.remove('hash-open');
+  $('betNote').innerHTML = seedLineHTML();
   disableLampButtons();
 
   setBots(msg.bots);                 // стол раунда приходит с сервера (общий для всех)
@@ -3033,6 +3045,42 @@ function renderAutoStatus(){
 }
 
 /* ── BET ──────────────────────────────────────────────────────────── */
+/* ── ROUND HASH под BET: публичный commit (sha256 server seed), не секрет ──
+   Показываем усечённо; клик по значению разворачивает полный хэш, кнопка
+   справа копирует его. Это commit раунда — раскрывать его безопасно. */
+function seedLineHTML(){
+  const short = (G.hash || '').slice(0, 10) + '…';
+  return `round hash: <span class="seed-val" id="seedVal" role="button" tabindex="0" `
+    + `onclick="toggleSeed()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSeed()}" `
+    + `title="Click to reveal full hash">${short}</span>`
+    + `<button type="button" class="seed-copy" aria-label="Copy round hash" title="Copy round hash" `
+    + `onclick="copyText(G.hash, this)">⧉</button> · bets open`;
+}
+function toggleSeed(){
+  const el = $('seedVal'), note = $('betNote');
+  if (!el || !note || !G.hash) return;
+  const open = note.classList.toggle('hash-open');
+  el.textContent = open ? G.hash : (G.hash.slice(0, 10) + '…');
+  el.title = open ? 'Click to collapse' : 'Click to reveal full hash';
+}
+/* копирование в буфер с откатом на execCommand (file://, старые webview) */
+function copyText(text, btn){
+  const flash = () => { if (!btn) return; const o = btn.innerHTML;
+    btn.innerHTML = '✓'; setTimeout(() => { btn.innerHTML = o; }, 900); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(flash, () => fallbackCopy(text, flash));
+    else fallbackCopy(text, flash);
+  } catch (e) { fallbackCopy(text, flash); }
+}
+function fallbackCopy(text, cb){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); cb && cb();
+  } catch (e) {}
+}
+
 function placeBet(){
   if (G.bet) return;
   if (G.phase !== 'STARTING'){

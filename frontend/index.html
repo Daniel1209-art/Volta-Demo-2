@@ -2046,6 +2046,13 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         <h3>Check the multiplier</h3>
         <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. The first 13 hex digits of that HMAC are turned into the multiplier by Bustabit's formula (a 1-in-40 chance of an instant ×1.00, otherwise <code>floor((100·2^52 − h) / (2^52 − h))/100</code>). Verify recomputes this locally and compares — no third-party site needed.</p>
         <div class="pf-mine">
+          <div class="pf-mine-lbl">Current round hash &#8212; published before the round starts</div>
+          <div class="pf-seedrow">
+            <span class="pf-seed" id="pfRoundHash">&#8230;</span>
+            <button type="button" class="seed-copy" aria-label="Copy current round hash" title="Copy" onclick="G.hash&amp;&amp;copyText(G.hash, this)">&#10697;</button>
+          </div>
+        </div>
+        <div class="pf-mine">
           <div class="pf-mine-lbl">Your client seed</div>
           <div class="pf-seedrow">
             <span class="pf-seed" id="pfMySeed">&#8230;</span>
@@ -2990,6 +2997,7 @@ function prepRound(msg){
   bb.disabled = false; bb.classList.remove('placed'); bb.textContent = 'BET';
   $('betNote').classList.remove('hash-open');
   $('betNote').innerHTML = seedLineHTML();
+  pfSetRoundHash();                   // хэш нового раунда виден и в открытой вкладке PF
   disableLampButtons();
 
   setBots(msg.bots);                 // стол раунда приходит с сервера (общий для всех)
@@ -3456,6 +3464,7 @@ function applyHello(m){
   } else if (m.phase === 'IN_PROGRESS'){       // вход посреди раунда — сразу живой стол
     G.round = m.roundId; G.phase = 'IN_PROGRESS';
     G.hash = m.hash; G.serverSeed = null; G.crashPoint = null;
+    pfSetRoundHash();
     G.startTime = srv2loc(m.startTime);
     G.timer.state = 'live';
     setBots(m.bots);                           // botTick досимулирует их до текущего множителя
@@ -3549,8 +3558,12 @@ function renderMyHistory(m){
 const PF = { rows: [], limit: 20 };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+function pfSetRoundHash(){
+  const el = $('pfRoundHash'); if (el) el.textContent = G.hash || '…';
+}
 function pfOpen(){
   const my = $('pfMySeed'); if (my) my.textContent = NET.clientSeed;
+  pfSetRoundHash();
   PF.limit = 20;
   const box = $('pfRounds'); if (box) box.innerHTML = '<p style="color:var(--t3);font-size:11px">Loading rounds…</p>';
   netSend({ t: 'pf', limit: PF.limit });

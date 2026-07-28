@@ -2049,7 +2049,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         <h3>Check the round hash</h3>
         <p>Take the revealed server seed, compute its SHA-256 yourself (the <b>Verify</b> button below does it in your browser with <code>crypto.subtle</code>), and compare it to the hash shown before the round. They must match.</p>
         <h3>Check the multiplier</h3>
-        <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. The first 13 hex digits of that HMAC are turned into the multiplier by Bustabit's formula (a 1-in-40 chance of an instant ×1.00, otherwise <code>floor((100·2^52 − h) / (2^52 − h))/100</code>). Verify recomputes this locally and compares — no third-party site needed.</p>
+        <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. That HMAC decides everything: 1 round in 40 ends instantly at ×1.00, and in every other round the first 13 hex digits of the HMAC become a number <code>h</code> that sets the multiplier — <code>floor((100·2^52 − h) / (2^52 − h))/100</code>. Verify recomputes this locally and compares — no third-party site needed.</p>
         <div class="pf-mine">
           <div class="pf-mine-lbl">Current round hash &#8212; published before the round starts</div>
           <div class="pf-seedrow">

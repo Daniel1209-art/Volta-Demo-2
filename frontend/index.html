@@ -1355,6 +1355,11 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 #mtBets:checked ~ .menu-tabs .menu-tab[for="mtBets"],
 #mtPF:checked ~ .menu-tabs .menu-tab[for="mtPF"]{color:var(--gold);background:var(--p3);border-color:var(--brd2)}
 .menu-tab:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+/* ПК: гамбургер в шапке лишний — меню открывается кнопкой профиля в сайдбаре;
+   на мобильных сайдбар спрятан в шторку, поэтому там кнопка остаётся */
+@media(min-width:1024px) and (min-aspect-ratio:1/1){
+  .hdr-right .info-btn[for="profToggle"]{display:none}
+}
 
 /* ── Provably Fair pane ── */
 .pf-intro{font-size:11.5px;color:var(--t2);line-height:1.7}

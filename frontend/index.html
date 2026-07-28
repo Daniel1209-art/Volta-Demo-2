@@ -146,7 +146,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 /* выпадающий список выбора трека */
 .snd-select{flex:1 1 auto;min-width:0;max-width:150px;background:var(--s2);border:1px solid var(--brd2);
   border-radius:8px;color:var(--txt);font-family:inherit;font-size:11px;font-weight:700;
-  padding:6px 26px 6px 10px;cursor:pointer;outline:none;transition:border-color .12s;
+  padding:6px 26px 6px 13px;cursor:pointer;outline:none;transition:border-color .12s;
   -webkit-appearance:none;appearance:none;text-overflow:ellipsis;
   background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23a855f7' stroke-width='1.6'><path d='M1 1l4 4 4-4'/></svg>");
   background-repeat:no-repeat;background-position:right 9px center}
@@ -304,7 +304,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .bet-card{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:9px 12px 11px}
 .zone-title{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;font-weight:700}
 .bet-inp-wrap{background:var(--s2);border:1px solid var(--brd2);border-radius:var(--rad-sm);
-  padding:8px 14px;display:flex;align-items:center;gap:6px;margin-bottom:7px;overflow:hidden}
+  padding:10px 18px;display:flex;align-items:center;gap:9px;margin-bottom:7px;overflow:hidden}
 .bet-amount{font-size:var(--fs-bet);font-weight:700;font-variant-numeric:tabular-nums;font-family:var(--font-display)}
 /* $ — префикс слева, не сжимается; число занимает остаток и усекается, а не наезжает на рамку */
 .bet-cur{font-size:clamp(15px,4vw,20px);font-weight:700;font-family:var(--font-display);
@@ -351,7 +351,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .as-lbl.off{color:var(--pk)}.as-lbl.on{color:var(--g)}
 .as-input{background:var(--s3);border:1px solid var(--brd);border-radius:7px;
   color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;
-  padding:6px 9px;width:100%;outline:none;transition:border-color .15s;font-variant-numeric:tabular-nums}
+  padding:7px 12px;width:100%;outline:none;transition:border-color .15s;font-variant-numeric:tabular-nums}
 .as-input:focus{border-color:var(--brd2)}
 .as-input.off-in{border-color:color-mix(in srgb,var(--pk) 18%,transparent)}
 .as-input.off-in:focus{border-color:var(--pk)}
@@ -483,7 +483,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
   .auto-head{margin-bottom:8px}
   .auto-grid{grid-template-columns:1fr 1fr;gap:7px 10px}
   .astage{padding:6px 10px}
-  .as-input{padding:5px 9px;font-size:13px}
+  .as-input{padding:5px 12px;font-size:13px}
   .auto-final{padding:6px 10px;margin-top:7px}
   .lb-col{grid-area:lb;height:100vh;height:100dvh;border-radius:0;
     border-top:none;border-right:none;border-bottom:none;border-left:1px solid var(--brd)}
@@ -1025,7 +1025,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 @media(max-width:767px){
   .bet-card{padding:8px 12px 9px}
   .bet-card .zone-title{margin-bottom:4px}
-  .bet-inp-wrap{padding:6px 12px;margin-bottom:6px}
+  .bet-inp-wrap{padding:8px 15px;margin-bottom:6px}
   .qrow{margin-bottom:6px}
   .bet-note{display:none}
   .lamp-ctrl{padding:7px}
@@ -1275,14 +1275,14 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   .lbtn{min-height:clamp(44px,6.4vh,72px)}
   .bet-card{padding:8px 12px 9px}
   .bet-card .zone-title{margin-bottom:4px}
-  .bet-inp-wrap{padding:6px 12px;margin-bottom:6px}
+  .bet-inp-wrap{padding:6px 15px;margin-bottom:6px}
   .qrow{margin-bottom:6px}
   .auto-card{padding:9px 12px}
   .auto-head{margin-bottom:6px}
   .auto-card .auto-grid{gap:4px}
   .astage{padding:4px 8px}
   .as-field{gap:2px}
-  .as-input{padding:4px 8px}
+  .as-input{padding:4px 10px}
   .auto-final{padding:4px 8px;margin-top:4px}
 }
 /* ── САМЫЕ НИЗКИЕ ОКНА В КОКПИТЕ (≤720px: 1280x650, 1280x700). Одних отступов
@@ -1292,7 +1292,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 @media(min-width:1024px) and (max-width:2559px) and (min-aspect-ratio:4/3) and (max-height:720px){
   .as-field{flex-direction:row;align-items:center;gap:5px}
   .as-lbl{flex:0 0 auto;white-space:nowrap}
-  .as-input{padding:3px 7px;font-size:12px;min-width:0}
+  .as-input{padding:3px 9px;font-size:12px;min-width:0}
   .astage{padding:3px 8px}
   .auto-final{padding:3px 8px}
 }
@@ -1305,7 +1305,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   .lamp-ctrl .lamp-btns{gap:7px}
   .lbtn{min-height:40px}
   .bet-card{padding:6px 10px 7px}
-  .bet-inp-wrap{padding:5px 11px;margin-bottom:5px}
+  .bet-inp-wrap{padding:5px 14px;margin-bottom:5px}
   .qrow{gap:6px;margin-bottom:5px}
   .qb{min-height:38px;padding:5px 4px}
   .bet-btn{padding:9px;min-height:40px}

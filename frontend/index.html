@@ -7,7 +7,7 @@
 <!-- FAVICON: жёлтая V (в цвет лого), вместо дефолтной «планеты» во вкладке -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%230a0a0f'/%3E%3Cpath%20d='M8.5%208.5%20L16%2023.5%20L23.5%208.5'%20fill='none'%20stroke='%23fbbf24'%20stroke-width='4.6'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="theme-color" content="#050507">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Jost:wght@700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -65,8 +65,10 @@
   --off-bg:color-mix(in srgb,var(--p) 16%,transparent);
   --ease:cubic-bezier(.4,0,.2,1);
 }
+/* весь текст сайта — Jost Bold (700); загружается только это начертание */
 html,body{background:var(--bg);color:var(--txt);
-  font-family:var(--font-main);-webkit-font-smoothing:antialiased}
+  font-family:var(--font-main);font-weight:700;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-weight:700}
 body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 
 .vis-toggle{position:absolute;width:0;height:0;opacity:0;pointer-events:none;margin:0}
@@ -83,8 +85,8 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
   display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
 .hist-bar::-webkit-scrollbar{display:none}
 .hist-lbl{font-size:9px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;
-  white-space:nowrap;flex-shrink:0;font-weight:600}
-.hc{flex-shrink:0;font-size:var(--fs-sm);font-weight:600;padding:4px 12px;border-radius:20px}
+  white-space:nowrap;flex-shrink:0;font-weight:700}
+.hc{flex-shrink:0;font-size:var(--fs-sm);font-weight:700;padding:4px 12px;border-radius:20px}
 .hc-l{background:var(--g2);color:var(--g)}
 .hc-m{background:var(--b2);color:var(--b)}
 .hc-h{background:var(--p2);color:var(--p)}
@@ -94,7 +96,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 .hdr{width:100%;padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-wm{display:inline-flex;align-items:center;gap:.01em;
-  font-family:var(--font-display);font-weight:800;font-size:var(--fs-logo);
+  font-family:var(--font-display);font-weight:700;font-size:var(--fs-logo);
   letter-spacing:.12em;color:var(--gold);line-height:1}
 /* у «V» letter-spacing добавлял .12em ПОСЛЕ буквы → зазор V–O был в 7 раз шире
    зазора O–L; убираем трейлинг-спейсинг, чтобы O-молния стояла симметрично */
@@ -133,7 +135,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 .snd-backdrop{position:fixed;inset:0;z-index:1240;pointer-events:none;background:transparent}
 #sndToggle:checked ~ .snd-backdrop{pointer-events:auto;cursor:default}
 .snd-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px}
-.snd-name{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--t2);font-weight:600}
+.snd-name{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--t2);font-weight:700}
 .snd-range{-webkit-appearance:none;appearance:none;flex:1 1 auto;min-width:0;max-width:120px;
   height:4px;border-radius:2px;outline:none;cursor:pointer;
   background:linear-gradient(90deg,var(--p) var(--vfill,80%),var(--s3) var(--vfill,80%))}
@@ -143,7 +145,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 .snd-sep{height:1px;background:var(--brd);flex-shrink:0}
 /* выпадающий список выбора трека */
 .snd-select{flex:1 1 auto;min-width:0;max-width:150px;background:var(--s2);border:1px solid var(--brd2);
-  border-radius:8px;color:var(--txt);font-family:inherit;font-size:11px;font-weight:600;
+  border-radius:8px;color:var(--txt);font-family:inherit;font-size:11px;font-weight:700;
   padding:6px 26px 6px 10px;cursor:pointer;outline:none;transition:border-color .12s;
   -webkit-appearance:none;appearance:none;text-overflow:ellipsis;
   background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23a855f7' stroke-width='1.6'><path d='M1 1l4 4 4-4'/></svg>");
@@ -158,7 +160,7 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
   transform:translateX(-50%);z-index:1300;display:inline-flex;align-items:center;gap:7px;
   padding:9px 18px;border-radius:999px;border:1px solid rgba(168,85,247,.45);
   background:rgba(18,14,28,.95);color:#ece8f8;font-family:inherit;font-size:12.5px;
-  font-weight:600;letter-spacing:.02em;box-shadow:0 8px 30px rgba(0,0,0,.55);
+  font-weight:700;letter-spacing:.02em;box-shadow:0 8px 30px rgba(0,0,0,.55);
   cursor:pointer;-webkit-tap-highlight-color:transparent;
   transition:opacity .3s ease,transform .3s ease}
 .snd-hint[hidden]{display:none}
@@ -218,7 +220,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .recv-block::before{content:'';position:absolute;inset:0;
   background:radial-gradient(ellipse 80% 80% at 50% 50%,color-mix(in srgb,var(--p) 6%,transparent),transparent);
   pointer-events:none}
-.recv-mult{font-size:var(--fs-mult);font-weight:800;color:var(--txt);font-family:var(--font-display);
+.recv-mult{font-size:var(--fs-mult);font-weight:700;color:var(--txt);font-family:var(--font-display);
   font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.03em;text-shadow:0 0 30px var(--glow-p);white-space:nowrap}
 
 /* WIRE */
@@ -281,14 +283,14 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .pers-box{min-width:clamp(116px,32vw,150px);background:var(--s2);border:1px solid var(--brd);
   border-radius:var(--rad-sm);padding:4px 12px;text-align:center}
 .pers-lbl{font-size:8px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
-.pers-val{font-size:var(--fs-pers);font-weight:800;color:var(--gold);font-family:var(--font-display);
+.pers-val{font-size:var(--fs-pers);font-weight:700;color:var(--gold);font-family:var(--font-display);
   font-variant-numeric:tabular-nums;line-height:1.1}
 /* живой подсчёт выигрыша в деньгах — прямо в блоке личного множителя */
-.pers-pay{font-size:clamp(12px,3.2vw,15px);font-weight:800;font-variant-numeric:tabular-nums;
+.pers-pay{font-size:clamp(12px,3.2vw,15px);font-weight:700;font-variant-numeric:tabular-nums;
   line-height:1.25;margin-top:1px;color:var(--g);letter-spacing:.01em;transition:color .2s;
   text-shadow:0 0 14px color-mix(in srgb,var(--g) 45%,transparent)}
 .pers-pay.risk{color:var(--gold);text-shadow:0 0 14px color-mix(in srgb,var(--gold) 45%,transparent)}
-.pers-pay.idle{color:var(--t3);font-weight:600;text-shadow:none}
+.pers-pay.idle{color:var(--t3);font-weight:700;text-shadow:none}
 @keyframes filGlow{
   0%,100%{opacity:.88;filter:drop-shadow(0 0 3px currentColor)}
   50%{opacity:1;filter:drop-shadow(0 0 12px currentColor)}}
@@ -300,16 +302,16 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .controls{display:flex;flex-direction:column;gap:8px}
 .bet-zone{display:flex;flex-direction:column;gap:8px}
 .bet-card{background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:9px 12px 11px}
-.zone-title{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.zone-title{font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;font-weight:700}
 .bet-inp-wrap{background:var(--s2);border:1px solid var(--brd2);border-radius:var(--rad-sm);
   padding:8px 14px;display:flex;align-items:center;gap:6px;margin-bottom:7px;overflow:hidden}
-.bet-amount{font-size:var(--fs-bet);font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--font-display)}
+.bet-amount{font-size:var(--fs-bet);font-weight:700;font-variant-numeric:tabular-nums;font-family:var(--font-display)}
 /* $ — префикс слева, не сжимается; число занимает остаток и усекается, а не наезжает на рамку */
-.bet-cur{font-size:clamp(15px,4vw,20px);font-weight:800;font-family:var(--font-display);
+.bet-cur{font-size:clamp(15px,4vw,20px);font-weight:700;font-family:var(--font-display);
   color:var(--t2);flex-shrink:0;line-height:1}
 .qrow{display:flex;gap:7px;margin-bottom:8px}
 .qb{flex:1;background:var(--s2);border:1px solid var(--brd);border-radius:10px;min-height:clamp(44px,6vh,50px);
-  color:var(--t2);font-size:var(--fs-sm);font-weight:600;padding:7px 4px;text-align:center;cursor:pointer;
+  color:var(--t2);font-size:var(--fs-sm);font-weight:700;padding:7px 4px;text-align:center;cursor:pointer;
   transition:all .1s;touch-action:manipulation;display:flex;align-items:center;justify-content:center}
 .qb:hover{background:var(--s3);border-color:var(--brd2);color:var(--txt)}
 .qb:active{transform:scale(.96)}
@@ -322,7 +324,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
   display:flex;flex-direction:column;gap:10px}
 .lamp-ctrl .zone-title{display:none}
 .lamp-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1}
-.lbtn{padding:0 8px;border-radius:12px;border:none;font-size:var(--fs-lbtn);font-weight:900;font-family:var(--font-display);
+.lbtn{padding:0 8px;border-radius:12px;border:none;font-size:var(--fs-lbtn);font-weight:700;font-family:var(--font-display);
   letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .12s;min-height:clamp(52px,7.5vh,86px);touch-action:manipulation;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lbtn-on{background:var(--on-bg);color:var(--g);border:1.5px solid var(--on-brd);box-shadow:0 4px 24px var(--glow-g)}
@@ -339,13 +341,13 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .tog-track{width:36px;height:20px;border-radius:10px;background:color-mix(in srgb,var(--g) 20%,transparent);
   border:1.5px solid var(--g);position:relative}
 .tog-knob{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--g);box-shadow:0 0 6px var(--glow-g)}
-.tog-lbl{font-size:11px;font-weight:600;color:var(--g)}
+.tog-lbl{font-size:11px;font-weight:700;color:var(--g)}
 .auto-grid{display:grid;gap:6px}
 .astage{background:var(--s2);border:1px solid var(--brd);border-radius:var(--rad-sm);
   padding:7px 10px;display:grid;grid-template-columns:18px 1fr 1fr;gap:6px;align-items:center}
-.as-num{font-size:11px;font-weight:800;color:var(--p)}
+.as-num{font-size:11px;font-weight:700;color:var(--p)}
 .as-field{display:flex;flex-direction:column;gap:4px}
-.as-lbl{font-size:7px;letter-spacing:.07em;text-transform:uppercase;font-weight:600}
+.as-lbl{font-size:7px;letter-spacing:.07em;text-transform:uppercase;font-weight:700}
 .as-lbl.off{color:var(--pk)}.as-lbl.on{color:var(--g)}
 .as-input{background:var(--s3);border:1px solid var(--brd);border-radius:7px;
   color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;
@@ -368,7 +370,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
   z-index:3;line-height:1;transition:all .15s;user-select:none}
 .lb-close:hover{background:var(--r2);color:var(--r)}
 .lb-tabs{display:flex;border-bottom:1px solid var(--brd);flex-shrink:0}
-.lb-tab{flex:1;padding:10px;font-size:10px;font-weight:600;letter-spacing:.06em;
+.lb-tab{flex:1;padding:10px;font-size:10px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--t3);background:none;border:none;cursor:pointer;
   border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;text-align:center;user-select:none}
 .lb-phase{display:none;flex-direction:column;flex:1;overflow:hidden}
@@ -379,7 +381,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .lb-sum-lbl{font-size:9px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
 .onoff-bar-wrap{padding:8px 12px;background:var(--s2);border-bottom:1px solid var(--brd);flex-shrink:0}
 .onoff-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.onoff-labels{display:flex;justify-content:space-between;font-size:10px;font-weight:600}
+.onoff-labels{display:flex;justify-content:space-between;font-size:10px;font-weight:700}
 /* two-colour ratio bar: turquoise = ON (fill), yellow = OFF (track) */
 .onoff-bar{height:5px;border-radius:3px;background:var(--gold);overflow:hidden;flex:1}
 .onoff-fill{height:100%;background:var(--g);border-radius:3px 0 0 3px;transition:width .3s var(--ease)}
@@ -391,7 +393,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
   padding:7px 12px;border-bottom:.5px solid var(--brd);transition:background .1s}
 .lb-row:hover{background:var(--s2)}.lb-row:last-child{border-bottom:none}
 .lb-left{display:flex;align-items:center;gap:7px;min-width:0;flex:1 1 auto}
-.lb-rank{font-size:9px;color:var(--t3);font-weight:600;width:14px;text-align:center;flex-shrink:0}
+.lb-rank{font-size:9px;color:var(--t3);font-weight:700;width:14px;text-align:center;flex-shrink:0}
 .lb-ava{width:22px;height:22px;border-radius:50%;background:var(--btn-grad);flex-shrink:0;
   display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
 .lb-name{font-size:11px;color:var(--t2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -423,7 +425,7 @@ body:has(#sndToggle:checked) .snd-hint{display:none}
 .modal-body h3{font-size:10px;color:var(--txt);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 5px;font-weight:700}
 .modal-body h3:first-child{margin-top:0}
 .modal-body p{margin-bottom:6px}
-.hl-on{color:var(--g);font-weight:600}.hl-off{color:var(--pk);font-weight:600}.hl-p{color:var(--p);font-weight:600}
+.hl-on{color:var(--g);font-weight:700}.hl-off{color:var(--pk);font-weight:700}.hl-p{color:var(--p);font-weight:700}
 #infoToggle:checked ~ .modal-overlay{opacity:1;pointer-events:auto}
 #infoToggle:checked ~ .modal-overlay .modal-box{transform:translateY(0)}
 .lb-backdrop{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 74%,transparent);z-index:1090;
@@ -560,7 +562,7 @@ body::after{content:none}
 
 /* bet amount becomes a real input, styled identically to the design's number */
 input.bet-amount{background:none;border:none;outline:none;color:var(--txt);
-  font-family:var(--font-display);font-weight:800;flex:1 1 auto;width:auto;min-width:0;padding:0;
+  font-family:var(--font-display);font-weight:700;flex:1 1 auto;width:auto;min-width:0;padding:0;
   text-overflow:ellipsis;-moz-appearance:textfield;appearance:textfield}
 input.bet-amount::-webkit-outer-spin-button,
 input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -574,7 +576,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .bet-btn.placed:hover{transform:none;filter:none}
 
 /* round status caption + payout hint + seed line — slot into existing cards */
-.status-txt{color:var(--p);font-weight:600}
+.status-txt{color:var(--p);font-weight:700}
 .bet-note{font-size:9px;color:var(--t3);margin-top:8px;line-height:1.4;
   font-variant-numeric:tabular-nums;letter-spacing:.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -640,8 +642,8 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .start-timer{width:100%;margin-top:2px;display:flex;flex-direction:column;align-items:center;gap:6px;
   background:var(--surface);border:1px solid var(--brd);border-radius:var(--rad);padding:9px 14px}
 .st-head{display:flex;align-items:baseline;gap:9px}
-.st-lbl{font-size:9px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;font-weight:600}
-.st-sec{font-size:24px;font-weight:800;font-family:var(--font-display);font-variant-numeric:tabular-nums;
+.st-lbl{font-size:9px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.st-sec{font-size:24px;font-weight:700;font-family:var(--font-display);font-variant-numeric:tabular-nums;
   line-height:1;color:var(--b);min-width:24px;text-align:center;transition:color .3s}
 .st-bar{width:100%;height:4px;border-radius:3px;background:var(--s3);overflow:hidden}
 .st-fill{height:100%;width:100%;border-radius:3px;background:linear-gradient(90deg,var(--b),var(--m-color));
@@ -879,7 +881,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 @keyframes lbDotPulse{0%,100%{box-shadow:0 0 7px var(--glow-g)}50%{box-shadow:0 0 13px var(--glow-g)}}
 
 /* ON/OFF ratio percentage, beside the bar */
-.onoff-pct{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--g);
+.onoff-pct{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--g);
   flex-shrink:0;min-width:40px;text-align:right;letter-spacing:.02em}
 
 /* total table winnings, revealed when the round ends */
@@ -887,7 +889,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   background:var(--g2);border:1px solid var(--on-brd);border-radius:var(--rad-sm);
   padding:7px 10px;color:var(--g);font-variant-numeric:tabular-nums}
 .lb-round-win[hidden]{display:none}
-.lb-round-win b{color:var(--gold);font-weight:800}
+.lb-round-win b{color:var(--gold);font-weight:700}
 @media(max-width:719px){.lb-title{padding-right:46px}}
 @media(prefers-reduced-motion:reduce){.lb-title.lb-live .lb-title-dot{animation:none}}
 
@@ -921,7 +923,7 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   background:radial-gradient(120% 92% at 50% -8%,color-mix(in srgb,var(--g) 22%,transparent),transparent 62%)}
 .win-pop-card>*{position:relative}
 .win-pop-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--g);font-weight:700}
-.win-pop-amt{font-family:var(--font-display);font-weight:800;font-size:clamp(28px,7vw,36px);line-height:1.1;
+.win-pop-amt{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,7vw,36px);line-height:1.1;
   color:var(--g);margin-top:3px;font-variant-numeric:tabular-nums;text-shadow:0 0 26px var(--glow-g)}
 .win-pop-sub{font-size:11px;color:var(--t2);margin-top:5px;font-variant-numeric:tabular-nums}
 .win-pop-sub b{color:var(--gold);font-weight:700}
@@ -1321,7 +1323,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 .prof-btn:hover{background:var(--p3)}
 .prof-btn:active{background:var(--p2)}
 .prof-ava{width:24px;height:24px;border-radius:50%;background:var(--btn-grad);flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
 .prof-nick{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--gold);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .prof-hint{font-size:8px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
@@ -1383,7 +1385,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 .pf-rhead:hover{background:var(--p3)}
 .pf-rid{color:var(--t3);font-weight:700}
 .pf-rtime{color:var(--t3);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf-rmult{font-weight:800;color:var(--gold)}
+.pf-rmult{font-weight:700;color:var(--gold)}
 .pf-rchev{color:var(--t3);transition:transform .15s}
 .pf-round.open .pf-rchev{transform:rotate(90deg)}
 .pf-rbody{display:none;padding:2px 10px 10px}

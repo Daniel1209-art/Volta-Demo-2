@@ -560,10 +560,13 @@ body::after{content:none}
 #lampRing{transition:stroke .3s var(--ease),stroke-dasharray .3s var(--ease)}
 .lamp-ring-anim{transition:opacity .3s var(--ease)}
 
-/* bet amount becomes a real input, styled identically to the design's number */
+/* bet amount becomes a real input, styled identically to the design's number;
+   число центрируется в ПОЛЕ: text-align:center + невидимый зеркальный "$"
+   справа (.bet-cur-ghost) уравновешивает настоящий префикс слева */
 input.bet-amount{background:none;border:none;outline:none;color:var(--txt);
   font-family:var(--font-display);font-weight:700;flex:1 1 auto;width:auto;min-width:0;padding:0;
-  text-overflow:ellipsis;-moz-appearance:textfield;appearance:textfield}
+  text-align:center;text-overflow:ellipsis;-moz-appearance:textfield;appearance:textfield}
+.bet-cur-ghost{visibility:hidden}
 input.bet-amount::-webkit-outer-spin-button,
 input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .bet-inp-wrap{transition:border-color .15s}
@@ -1846,6 +1849,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
           <div class="bet-inp-wrap">
             <span class="bet-cur">$</span>
             <input class="bet-amount" id="betAmt" type="number" inputmode="numeric" value="1" min="1" max="100" step="1" aria-label="Bet amount">
+            <span class="bet-cur bet-cur-ghost" aria-hidden="true">$</span>
           </div>
           <div class="qrow">
             <button class="qb" type="button" onclick="qb(.5)">1/2</button>

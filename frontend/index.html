@@ -96,6 +96,9 @@ body{min-height:100vh;min-height:100dvh;background-attachment:fixed}
 .logo-wm{display:inline-flex;align-items:center;gap:.01em;
   font-family:var(--font-display);font-weight:800;font-size:var(--fs-logo);
   letter-spacing:.12em;color:var(--gold);line-height:1}
+/* у «V» letter-spacing добавлял .12em ПОСЛЕ буквы → зазор V–O был в 7 раз шире
+   зазора O–L; убираем трейлинг-спейсинг, чтобы O-молния стояла симметрично */
+.logo-wm span:first-child{letter-spacing:0}
 .wm-o{display:inline-flex;align-items:center;justify-content:center;
   width:.84em;height:.84em;flex-shrink:0;margin:0 .01em}
 .wm-o svg{width:100%;height:100%;overflow:visible}

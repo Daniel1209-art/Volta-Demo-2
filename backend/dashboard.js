@@ -25,6 +25,19 @@ const LOGIN_LOCK_MS  = 15 * 60 * 1000;           // …за это окно → 
 /* окна метрик: скользящие от текущего момента (docs/analytics.md) */
 const PERIODS = { '1d': 24 * 3600e3, '7d': 7 * 24 * 3600e3, '1m': 30 * 24 * 3600e3 };
 
+/* Теоретический RTP зафиксирован аудитом в docs/analytics.md и от периода не
+   зависит — за окно считается только фактический. Переиспользовать в коде было
+   нечего: константы RTP нет ни в shared/engine.js, ни в конфиге (README
+   называет лишь диапазон «~96.5–97.5%»), поэтому значение из документа живёт
+   здесь единственным местом. */
+const THEORETICAL_RTP = Number(process.env.THEORETICAL_RTP || 0.9653);
+
+/* доли (0..1), а не проценты — форматирует потребитель */
+const share = (part, total) => (total > 0 ? +(part / total).toFixed(6) : null);
+const round2 = (v) => (v === null || v === undefined ? null : +Number(v).toFixed(2));
+/* crash_point лежит ×100 целым, 0 = мгновенный краш ×1.00 */
+const CRASH_X100 = 'CASE WHEN crash_point = 0 THEN 100 ELSE crash_point END';
+
 function createDashboard({ dbPath, clientIp, ipHash }){
   const password = process.env.DASHBOARD_PASSWORD || '';
   const enabled  = password.length > 0;
@@ -122,9 +135,54 @@ function createDashboard({ dbPath, clientIp, ipHash }){
     return json(res, 200, issueToken());
   }
 
-  /* Таблица маршрутов заполняется блоками метрик ниже. Значение —
-     функция (req, res, url, session). */
+  /* подготовленные запросы переиспользуются между вызовами */
+  const stmts = new Map();
+  const sql = (text) => {
+    let s = stmts.get(text);
+    if (!s){ s = db().prepare(text); stmts.set(text, s); }
+    return s;
+  };
+
+  /* Таблица маршрутов. Значение — функция (req, res, url, session). */
   const routes = new Map();
+  const badPeriod = (res) => json(res, 400, { error: 'bad_period', allowed: Object.keys(PERIODS) });
+
+  /* ── 2. МНОЖИТЕЛИ УРОВНЯ РАУНДА ─────────────────────────────────────
+     MAX и AVG глобального crash_point за окно — по времени КРАША раунда
+     (rounds.crashed_at), а не по времени ставки. */
+  routes.set('multiplier-stats', (req, res, url) => {
+    const w = windowOf(url);
+    if (!w) return badPeriod(res);
+    const r = sql(`SELECT COUNT(*) AS rounds,
+                          MAX(${CRASH_X100}) AS mx,
+                          AVG(${CRASH_X100}) AS av,
+                          SUM(CASE WHEN crash_point = 0 THEN 1 ELSE 0 END) AS busts
+                   FROM rounds WHERE crashed_at >= ? AND crashed_at <= ?`).get(w.from, w.to);
+    json(res, 200, {
+      period: w.period, from: w.from, to: w.to,
+      rounds: r.rounds,
+      max: r.rounds ? round2(r.mx / 100) : null,
+      avg: r.rounds ? +(r.av / 100).toFixed(4) : null,
+      instantBusts: r.busts || 0,            // мгновенные ×1.00, они же crash_point = 0
+    });
+  });
+
+  /* ── 3. RTP ────────────────────────────────────────────────────────
+     Фактический — по ставкам окна; теоретический отдаётся константой. */
+  routes.set('rtp', (req, res, url) => {
+    const w = windowOf(url);
+    if (!w) return badPeriod(res);
+    const r = sql(`SELECT COUNT(*) AS bets,
+                          COALESCE(SUM(amount), 0) AS volume,
+                          COALESCE(SUM(payout), 0) AS payout
+                   FROM bets WHERE created_at >= ? AND created_at <= ? AND is_bot = 0`).get(w.from, w.to);
+    json(res, 200, {
+      period: w.period, from: w.from, to: w.to,
+      bets: r.bets, volume: round2(r.volume), payout: round2(r.payout),
+      actualRtp: share(r.payout, r.volume),
+      theoreticalRtp: THEORETICAL_RTP,
+    });
+  });
 
   async function handle(req, res, url){
     if (!url.pathname.startsWith('/api/dashboard/')) return false;

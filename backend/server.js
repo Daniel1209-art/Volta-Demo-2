@@ -77,6 +77,9 @@ db.exec(`
     client_seeds TEXT,               -- JSON-массив использованных client seed-ов раунда
     seed_mode    TEXT                -- 'multi' (реальные игроки) | 'single' (системный seed)
   );
+  /* окна дашборда фильтруют раунды по времени краша; без индекса это SCAN по
+     всей таблице, а при retention 35 суток там ~98 тыс. строк */
+  CREATE INDEX IF NOT EXISTS rounds_crashed ON rounds(crashed_at);
   CREATE TABLE IF NOT EXISTS bets (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id  TEXT NOT NULL,

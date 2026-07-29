@@ -36,6 +36,12 @@ if ! cmp -s "$SITE_DIR/deploy/nginx/volta-demo.conf" /etc/nginx/sites-available/
 fi
 ln -sf /etc/nginx/sites-available/volta-demo.conf /etc/nginx/sites-enabled/volta-demo.conf
 
+# конфиг поддомена аналитики — тем же способом
+if ! cmp -s "$SITE_DIR/deploy/nginx/dashboard-volta-demo.conf" /etc/nginx/sites-available/dashboard-volta-demo.conf; then
+  cp "$SITE_DIR/deploy/nginx/dashboard-volta-demo.conf" /etc/nginx/sites-available/dashboard-volta-demo.conf
+fi
+ln -sf /etc/nginx/sites-available/dashboard-volta-demo.conf /etc/nginx/sites-enabled/dashboard-volta-demo.conf
+
 # права: статикой и данными владеет www-data (бэкенд работает от него)
 chown -R www-data:www-data "$SITE_DIR"
 

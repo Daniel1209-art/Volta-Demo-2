@@ -26,6 +26,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const E = require('../shared/engine.js');   // общая crash-математика (не менять!)
+const { createDashboard } = require('./dashboard.js');   // read-only API аналитики
 
 /* ── КОНФИГ (env / .env; секретов нет) ────────────────────────────── */
 loadDotEnv(path.join(__dirname, '.env'));
@@ -658,8 +659,20 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const FRONT = path.join(__dirname, '..', 'frontend');
 const SHARED = path.join(__dirname, '..', 'shared');
 
+/* дашборд ходит в свою read-only копию соединения и игровое состояние не трогает */
+const DASH = createDashboard({ dbPath: DB_PATH, clientIp, ipHash });
+
 const server = http.createServer((req, res) => {
-  const url = (req.url || '/').split('?')[0];
+  const u = new URL(req.url || '/', 'http://localhost');
+  const url = u.pathname;
+  if (url.startsWith('/api/dashboard/')){
+    DASH.handle(req, res, u).catch((e) => {
+      console.error('dashboard failed:', e.message);
+      if (!res.headersSent){ res.writeHead(500, { 'Content-Type': 'application/json' }); }
+      res.end(JSON.stringify({ error: 'internal_error' }));
+    });
+    return;
+  }
   if (url === '/api/health'){
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, phase: R.phase, roundId: R.roundId,

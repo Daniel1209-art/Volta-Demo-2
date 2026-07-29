@@ -35,10 +35,12 @@ const THEORETICAL_RTP = Number(process.env.THEORETICAL_RTP || 0.9653);
 /* доли (0..1), а не проценты — форматирует потребитель */
 const share = (part, total) => (total > 0 ? +(part / total).toFixed(6) : null);
 const round2 = (v) => (v === null || v === undefined ? null : +Number(v).toFixed(2));
+const round4 = (v) => (v === null || v === undefined ? null : +Number(v).toFixed(4));
 /* crash_point лежит ×100 целым, 0 = мгновенный краш ×1.00 */
 const CRASH_X100 = 'CASE WHEN crash_point = 0 THEN 100 ELSE crash_point END';
 
-function createDashboard({ dbPath, clientIp, ipHash }){
+function createDashboard({ dbPath, clientIp, ipHash, maxSwitches }){
+  const MAX_SWITCHES = maxSwitches;            // из shared/engine.js, знаменатель метрики 4б
   const password = process.env.DASHBOARD_PASSWORD || '';
   const enabled  = password.length > 0;
 
@@ -181,6 +183,114 @@ function createDashboard({ dbPath, clientIp, ipHash }){
       bets: r.bets, volume: round2(r.volume), payout: round2(r.payout),
       actualRtp: share(r.payout, r.volume),
       theoreticalRtp: THEORETICAL_RTP,
+    });
+  });
+
+  /* ── 4. ИСПОЛЬЗОВАНИЕ ЛАМПЫ ────────────────────────────────────────
+     а) доля ставок хотя бы с одним OFF против «лампа провисела ON весь раунд»;
+     б) средний процент израсходованных переключений из MAX_SWITCHES.
+     Оба считаются по готовым колонкам bets, а не агрегацией lamp_events:
+     switches_used тождественно равен числу ON-событий с src != 'free'
+     (бесплатный старт переключение не тратит), проверено на данных прода. */
+  routes.set('lamp-usage', (req, res, url) => {
+    const w = windowOf(url);
+    if (!w) return badPeriod(res);
+    const r = sql(`SELECT COUNT(*) AS bets,
+                          COALESCE(SUM(had_off), 0) AS withOff,
+                          COALESCE(SUM(switches_used), 0) AS switches
+                   FROM bets WHERE created_at >= ? AND created_at <= ? AND is_bot = 0`).get(w.from, w.to);
+    const withoutOff = r.bets - r.withOff;
+    const avgSwitches = r.bets ? r.switches / r.bets : null;
+    json(res, 200, {
+      period: w.period, from: w.from, to: w.to,
+      bets: r.bets,
+      withOff: r.withOff,
+      withoutOff,                                     // лампа горела до самого краша
+      shareWithOff: share(r.withOff, r.bets),
+      shareWithoutOff: share(withoutOff, r.bets),
+      avgSwitchesUsed: round4(avgSwitches),
+      avgSwitchUsage: avgSwitches === null ? null : +(avgSwitches / MAX_SWITCHES).toFixed(6),
+      maxSwitches: MAX_SWITCHES,
+    });
+  });
+
+  /* ── 5. ПРОНИКНОВЕНИЕ АВТОПИЛОТА ───────────────────────────────────
+     Две РАЗНЫЕ величины, обе нужны и обе есть готовыми колонками:
+       auto_switches > 0 — автопилот реально дёрнул лампу (= есть событие
+         lamp_events с src='auto');
+       auto_bet = 1      — ставка сделана при включённом автопилоте, но раунд
+         мог рухнуть раньше первой ступени, и тогда переключений не было.
+     Смешивать их нельзя: первая мерит применение, вторая — намерение. */
+  routes.set('autopilot-adoption', (req, res, url) => {
+    const w = windowOf(url);
+    if (!w) return badPeriod(res);
+    const r = sql(`SELECT COUNT(*) AS bets,
+                          SUM(CASE WHEN auto_switches > 0 THEN 1 ELSE 0 END) AS withAutoSwitch,
+                          COALESCE(SUM(auto_bet), 0) AS withAutopilotOn,
+                          COALESCE(SUM(auto_switches), 0) AS autoSwitches
+                   FROM bets WHERE created_at >= ? AND created_at <= ? AND is_bot = 0`).get(w.from, w.to);
+    const withAuto = r.withAutoSwitch || 0;
+    json(res, 200, {
+      period: w.period, from: w.from, to: w.to,
+      bets: r.bets,
+      withAutoSwitch: withAuto,
+      fullyManual: r.bets - withAuto,                 // только free/manual за весь раунд
+      shareWithAutoSwitch: share(withAuto, r.bets),
+      shareFullyManual: share(r.bets - withAuto, r.bets),
+      withAutopilotEnabled: r.withAutopilotOn,
+      shareWithAutopilotEnabled: share(r.withAutopilotOn, r.bets),
+      /* переключения, выполненные автопилотом, — это события ON И OFF, тогда как
+         switches_used считает только ON, поэтому доли одного от другого тут нет:
+         величины в разных единицах, и их отношение ничего не значит */
+      autoSwitches: r.autoSwitches,
+    });
+  });
+
+  /* ── 6. ЛИЧНЫЙ МНОЖИТЕЛЬ ПРОТИВ ФИНАЛА РАУНДА ──────────────────────
+     Два блока по согласованию, потому что это разные вопросы:
+       cashoutVsCrash — где игрок нажал OFF против того, где раунд рухнул
+         («рано ли вышел»); строки без единого OFF сюда не входят, у них
+         cashout_mult = NULL;
+       finalVsCrash  — выплатной множитель против пика («сколько в итоге взял»).
+     Категории берутся из готового bets.win, заново не пересчитываются. */
+  routes.set('personal-vs-crash', (req, res, url) => {
+    const w = windowOf(url);
+    if (!w) return badPeriod(res);
+    const where = 'created_at >= ? AND created_at <= ? AND is_bot = 0';
+    /* внешние скобки обязательны: без них «cashout_mult / crash» разворачивается
+       в (cashout_mult / crash_point) / 100 — деление левоассоциативно */
+    const crash = `((${CRASH_X100}) / 100.0)`;
+    const g = sql(`SELECT COUNT(*) AS bets, COALESCE(SUM(win), 0) AS wins
+                   FROM bets WHERE ${where}`).get(w.from, w.to);
+    const a = sql(`SELECT COUNT(*) AS bets, AVG(cashout_mult) AS avgCashout, AVG(${crash}) AS avgCrash,
+                          AVG(cashout_mult - ${crash}) AS avgDev, AVG(cashout_mult / ${crash}) AS avgRatio
+                   FROM bets WHERE ${where} AND cashout_mult IS NOT NULL`).get(w.from, w.to);
+    const b = sql(`SELECT COUNT(*) AS bets, AVG(final_mult) AS avgFinal, AVG(${crash}) AS avgCrash,
+                          AVG(final_mult - ${crash}) AS avgDev
+                   FROM bets WHERE ${where}`).get(w.from, w.to);
+    const busted = g.bets - g.wins;
+    json(res, 200, {
+      period: w.period, from: w.from, to: w.to,
+      bets: g.bets,
+      distribution: {
+        cashedOut: g.wins,                            // зафиксировались раньше пика
+        busted,                                       // держали до краша и сгорели
+        cashedOutShare: share(g.wins, g.bets),
+        bustedShare: share(busted, g.bets),
+      },
+      cashoutVsCrash: {
+        bets: a.bets,
+        avgCashoutMult: round4(a.avgCashout),
+        avgCrashMult: round4(a.avgCrash),
+        avgDeviation: round4(a.avgDev),               // < 0 — вышел раньше пика
+        avgRatio: round4(a.avgRatio),                 // доля пика, взятая игроком
+      },
+      finalVsCrash: {
+        bets: b.bets,
+        avgFinalMult: round4(b.avgFinal),
+        avgCrashMult: round4(b.avgCrash),
+        avgDeviation: round4(b.avgDev),
+      },
     });
   });
 

@@ -663,7 +663,7 @@ const FRONT = path.join(__dirname, '..', 'frontend');
 const SHARED = path.join(__dirname, '..', 'shared');
 
 /* дашборд ходит в свою read-only копию соединения и игровое состояние не трогает */
-const DASH = createDashboard({ dbPath: DB_PATH, clientIp, ipHash });
+const DASH = createDashboard({ dbPath: DB_PATH, clientIp, ipHash, maxSwitches: E.MAX_SWITCHES });
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url || '/', 'http://localhost');

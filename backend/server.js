@@ -36,6 +36,18 @@ const RESET_TZ     = process.env.RESET_TZ || 'UTC';        // TZ суточно�
 const HISTORY_LEN  = parseInt(process.env.HISTORY_LEN || '50', 10);   // чипы истории для клиента
 const SERVE_STATIC = process.env.SERVE_STATIC === '1';     // локальная разработка без nginx
 
+/* ── АНАЛИТИКА ────────────────────────────────────────────────────────
+   Дашборд считает метрики скользящими окнами 1д/7д/30д, поэтому история
+   должна пережить месяц: прежняя чистка резала ставки по календарному дню,
+   а раунды — до последних 600 (≈4 часа), и окна длиннее суток были
+   принципиально нерасчитуемы. Суточный сброс «My Game History» на это не
+   завязан: клиентская выборка и так фильтрует по сегодняшнему дню. */
+const RETENTION_DAYS  = parseInt(process.env.RETENTION_DAYS || '35', 10);
+/* сессия логическая: возврат в это окно продолжает прежнюю, а не заводит новую,
+   иначе перезагрузка страницы и обрыв мобильной сети дробят «время в игре» */
+const SESSION_IDLE_MS = parseInt(process.env.SESSION_IDLE_MS || String(30 * 60 * 1000), 10);
+const GEOIP_CSV       = process.env.GEOIP_CSV || path.join(__dirname, '..', 'data', 'geoip.csv');
+
 function loadDotEnv(file){
   try {
     for (const line of fs.readFileSync(file, 'utf8').split('\n')){
@@ -76,12 +88,67 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS bets_player_day ON bets(player_id, day);
+  CREATE INDEX IF NOT EXISTS bets_created    ON bets(created_at);
+
+  /* Игровая сессия — ЛОГИЧЕСКАЯ: несколько ws-соединений (вкладки, переподключения)
+     одного игрока в пределах SESSION_IDLE_MS склеиваются в одну строку.
+     ended_at пустой = сессия ещё идёт; last_seen_at двигают ws-пинги.
+     Сырой IP не хранится: только ip_hash = SHA256(IP + серверная соль) и гео. */
+  CREATE TABLE IF NOT EXISTS sessions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id    TEXT NOT NULL,
+    started_at   INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    ended_at     INTEGER,
+    ip_hash      TEXT,
+    country      TEXT,
+    region       TEXT,
+    is_bot       INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS sessions_player  ON sessions(player_id, started_at);
+  CREATE INDEX IF NOT EXISTS sessions_started ON sessions(started_at);
+
+  /* Сырая последовательность переключений лампы: пишется В МОМЕНТ события,
+     задним числом порядок ON/OFF восстановить нечем. seq — номер события
+     внутри раунда у игрока, src: 'free' (бесплатное включение на старте,
+     переключение не тратит) | 'manual' | 'auto'. Столбец назван lamp_on,
+     потому что ON — зарезервированное слово SQLite. */
+  CREATE TABLE IF NOT EXISTS lamp_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id   INTEGER NOT NULL,
+    player_id  TEXT NOT NULL,
+    session_id INTEGER,
+    seq        INTEGER NOT NULL,
+    lamp_on    INTEGER NOT NULL,
+    mult       REAL NOT NULL,
+    src        TEXT NOT NULL,
+    at         INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS lamp_events_round ON lamp_events(round_id, player_id);
+  CREATE INDEX IF NOT EXISTS lamp_events_at    ON lamp_events(at);
 `);
 /* миграция: у ранее созданной таблицы rounds могло не быть столбцов PF */
 {
   const cols = db.prepare('PRAGMA table_info(rounds)').all().map(c => c.name);
   if (!cols.includes('client_seeds')) db.exec('ALTER TABLE rounds ADD COLUMN client_seeds TEXT');
   if (!cols.includes('seed_mode'))    db.exec('ALTER TABLE rounds ADD COLUMN seed_mode TEXT');
+}
+/* миграция: аналитические столбцы ставки. crash_point дублируется в строку
+   ставки намеренно — метрика «личный множитель против финала раунда» не должна
+   ломаться, когда раунд выпадет из retention раньше ставки. */
+{
+  const cols = db.prepare('PRAGMA table_info(bets)').all().map(c => c.name);
+  const add = (name, decl) => { if (!cols.includes(name)) db.exec(`ALTER TABLE bets ADD COLUMN ${name} ${decl}`); };
+  add('session_id',    'INTEGER');
+  add('crash_point',   'INTEGER');            // глобальный краш раунда, ×100 (0 = мгновенный ×1.00)
+  add('cashout_mult',  'REAL');               // глобальный множитель в момент последнего OFF; NULL = не выключал
+  add('switches_used', 'INTEGER NOT NULL DEFAULT 0');   // из MAX_SWITCHES (=4); бесплатный старт не считается
+  add('on_count',      'INTEGER NOT NULL DEFAULT 0');
+  add('off_count',     'INTEGER NOT NULL DEFAULT 0');
+  add('had_off',       'INTEGER NOT NULL DEFAULT 0');   // хотя бы один OFF за раунд
+  add('auto_bet',      'INTEGER NOT NULL DEFAULT 0');   // ставка сделана при включённом автопилоте
+  add('auto_switches', 'INTEGER NOT NULL DEFAULT 0');   // из них выполнено автопилотом
+  add('is_bot',        'INTEGER NOT NULL DEFAULT 0');
 }
 const q = {
   getPlayer:  db.prepare('SELECT id, nick FROM players WHERE id = ?'),
@@ -91,16 +158,135 @@ const q = {
   lastRounds: db.prepare('SELECT round_id, crash_point FROM rounds ORDER BY round_id DESC LIMIT ?'),
   pfRounds:   db.prepare('SELECT round_id, hash, seed, crash_point, crashed_at, client_seeds, seed_mode FROM rounds ORDER BY round_id DESC LIMIT ?'),
   maxRound:   db.prepare('SELECT COALESCE(MAX(round_id), 0) AS m FROM rounds'),
-  addBet:     db.prepare('INSERT INTO bets (player_id, round_id, day, amount, final_mult, win, payout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+  addBet:     db.prepare(`INSERT INTO bets (player_id, round_id, day, amount, final_mult, win, payout, created_at,
+                            session_id, crash_point, cashout_mult, switches_used, on_count, off_count,
+                            had_off, auto_bet, auto_switches, is_bot)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?, ?,  ?, ?, ?, ?)`),
   myBetsDay:  db.prepare('SELECT round_id, amount, final_mult, win, payout, created_at FROM bets WHERE player_id = ? AND day = ? ORDER BY id DESC LIMIT 200'),
-  purgeBets:  db.prepare('DELETE FROM bets WHERE day < ?'),
-  purgeRounds:db.prepare('DELETE FROM rounds WHERE round_id <= ?'),
+  addLamp:    db.prepare('INSERT INTO lamp_events (round_id, player_id, session_id, seq, lamp_on, mult, src, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+  lastSess:   db.prepare('SELECT id, last_seen_at FROM sessions WHERE player_id = ? ORDER BY id DESC LIMIT 1'),
+  addSess:    db.prepare('INSERT INTO sessions (player_id, started_at, last_seen_at, ip_hash, country, region, is_bot) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+  /* возврат в окно склейки: сессия «оживает», гео/хеш дописываются только если их не было */
+  resumeSess: db.prepare(`UPDATE sessions SET last_seen_at = ?, ended_at = NULL,
+                            ip_hash = COALESCE(ip_hash, ?), country = COALESCE(country, ?), region = COALESCE(region, ?)
+                          WHERE id = ?`),
+  touchSess:  db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?'),
+  endSess:    db.prepare('UPDATE sessions SET ended_at = ?, last_seen_at = ? WHERE id = ? AND ended_at IS NULL'),
+  /* соединение оборвалось без close (спящий телефон, убитый Wi-Fi) — закрываем по последнему пингу */
+  sweepSess:  db.prepare('UPDATE sessions SET ended_at = last_seen_at WHERE ended_at IS NULL AND last_seen_at < ?'),
+  purgeBets:  db.prepare('DELETE FROM bets WHERE created_at < ?'),
+  purgeRounds:db.prepare('DELETE FROM rounds WHERE crashed_at < ?'),
+  purgeLamp:  db.prepare('DELETE FROM lamp_events WHERE at < ?'),
+  purgeSess:  db.prepare('DELETE FROM sessions WHERE started_at < ?'),
 };
 
 /* календарный день в настроенной TZ (по умолчанию UTC) — ключ суточного сброса */
 const dayFmt = new Intl.DateTimeFormat('en-CA',
   { timeZone: RESET_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const dayStr = (ts = Date.now()) => dayFmt.format(ts);
+
+/* ── IP: ХЕШ + ГЕО, СЫРОЙ АДРЕС НЕ ХРАНИТСЯ ────────────────────────────
+   ip_hash = SHA256(соль + IP): различает уникальных посетителей и повторные
+   визиты, но обратно в адрес не разворачивается. Соль генерируется один раз
+   рядом с БД (0600) — её потеря просто рвёт связь со старыми хешами, игровых
+   данных не касается. Сырой IP живёт только внутри обработчика соединения:
+   в БД уходят уже хеш и страна/регион. */
+const IP_SALT = (() => {
+  if (process.env.IP_SALT) return process.env.IP_SALT;
+  const f = path.join(path.dirname(DB_PATH), '.ip_salt');
+  try { const s = fs.readFileSync(f, 'utf8').trim(); if (s) return s; } catch (e) { /* первый запуск */ }
+  const s = crypto.randomBytes(32).toString('hex');
+  try { fs.writeFileSync(f, s, { mode: 0o600 }); }
+  catch (e) { console.error('ip salt not persisted (хеши не переживут рестарт):', e.message); }
+  return s;
+})();
+function clientIp(req){
+  /* за nginx реальный адрес приходит в X-Forwarded-For; первый элемент — клиент */
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return xff || req.socket.remoteAddress || '';
+}
+function ipHash(ip){ return ip ? crypto.createHash('sha256').update(IP_SALT + '|' + ip).digest('hex') : null; }
+
+/* IPv4 и IPv6 приводим к одной 32-символьной hex-шкале (v4 — как v4-mapped),
+   тогда диапазоны гео-таблицы сравниваются обычным строковым сравнением */
+function ipKey(ip){
+  if (!ip) return null;
+  let s = String(ip).split('%')[0];                       // отбрасываем zone-id (fe80::1%eth0)
+  if (s.startsWith('::ffff:') && s.includes('.')) s = s.slice(7);
+  if (s.includes('.')){
+    const p = s.split('.');
+    if (p.length !== 4) return null;
+    let hex = '';
+    for (const x of p){
+      const n = Number(x);
+      if (!Number.isInteger(n) || n < 0 || n > 255) return null;
+      hex += n.toString(16).padStart(2, '0');
+    }
+    return '00000000000000000000ffff' + hex;
+  }
+  if (!s.includes(':')) return null;
+  let parts;
+  if (s.includes('::')){
+    const [head, tail = ''] = s.split('::');
+    const a = head ? head.split(':') : [], b = tail ? tail.split(':') : [];
+    if (a.length + b.length > 8) return null;
+    parts = [...a, ...Array(8 - a.length - b.length).fill('0'), ...b];
+  } else parts = s.split(':');
+  if (parts.length !== 8) return null;
+  let hex = '';
+  for (const g of parts){
+    if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
+    hex += g.toLowerCase().padStart(4, '0');
+  }
+  return hex;
+}
+
+/* Офлайновая гео-таблица: CSV-диапазонник (DB-IP lite «IP to Country» —
+   start,end,country; либо city-уровень — start,end,continent,country,region,city).
+   Файла нет → страна/регион остаются NULL, всё остальное работает как обычно. */
+const GEO = (() => {
+  const rows = [];
+  try {
+    for (const line of fs.readFileSync(GEOIP_CSV, 'utf8').split('\n')){
+      const f = line.trim().replace(/"/g, '').split(',');
+      if (f.length < 3) continue;
+      const a = ipKey(f[0]), b = ipKey(f[1]);
+      if (!a || !b) continue;
+      rows.push(f.length >= 6 ? [a, b, f[3], f[4] || null] : [a, b, f[2], null]);
+    }
+    rows.sort((x, y) => x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
+    console.log(`geoip: ${rows.length} диапазонов из ${GEOIP_CSV}`);
+  } catch (e) {
+    console.log(`geoip: ${GEOIP_CSV} не найден — страна/регион не заполняются`);
+  }
+  return rows;
+})();
+function geoLookup(ip){
+  const k = ipKey(ip);
+  if (!k || !GEO.length) return { country: null, region: null };
+  let lo = 0, hi = GEO.length - 1, hit = null;
+  while (lo <= hi){                                   // последний диапазон со start <= k
+    const mid = (lo + hi) >> 1;
+    if (GEO[mid][0] > k) hi = mid - 1; else { hit = GEO[mid]; lo = mid + 1; }
+  }
+  if (!hit || hit[1] < k) return { country: null, region: null };
+  return { country: hit[2] || null, region: hit[3] || null };
+}
+
+/* ── СЕССИИ ───────────────────────────────────────────────────────────
+   is_bot: боты-заполнители стола живут только в памяти (spawnBots) и в БД не
+   попадают — сегодня в sessions/bets по определению только реальный трафик.
+   Флаг заведён, чтобы контракт дашборда не менялся, если источник трафика
+   появится позже; ЕДИНСТВЕННОЕ место, где его надо будет проставлять. */
+function openSession(playerId, net){
+  const now = Date.now();
+  const last = q.lastSess.get(playerId);
+  if (last && now - last.last_seen_at <= SESSION_IDLE_MS){
+    q.resumeSess.run(now, net.hash, net.country, net.region, last.id);
+    return last.id;
+  }
+  return Number(q.addSess.run(playerId, now, now, net.hash, net.country, net.region, 0).lastInsertRowid);
+}
 
 /* ── НИКИ: Volta-gamer + 5 СЛУЧАЙНЫХ цифр, стабильны между заходами ── */
 function randDigits5(){ return String(crypto.randomInt(0, 100000)).padStart(5, '0'); }
@@ -142,14 +328,24 @@ const players = new Map();   // clientId → P
 function P(id, nick){
   return { id, nick, sockets: new Set(),
            clientSeed: null,          // персональный provably-fair seed игрока (приходит с клиента)
+           sessionId: null,           // логическая сессия (склейка SESSION_IDLE_MS)
            bet: null, lampOn: false, lampEver: false,
            switchesLeft: E.MAX_SWITCHES, persAccum: 1.0, persOnEntry: 1.0,
-           settled: false, win: null, finalMult: null };
+           settled: false, win: null, finalMult: null,
+           /* аналитика раунда — живёт ровно один раунд, сбрасывается вместе с остальным */
+           autoBet: 0, lampSeq: 0, onCount: 0, offCount: 0, autoSwitches: 0, cashoutMult: null };
 }
 function resetPlayerRound(p){
   p.bet = null; p.lampOn = false; p.lampEver = false;
   p.switchesLeft = E.MAX_SWITCHES; p.persAccum = 1.0; p.persOnEntry = 1.0;
   p.settled = false; p.win = null; p.finalMult = null;
+  p.autoBet = 0; p.lampSeq = 0; p.onCount = 0; p.offCount = 0; p.autoSwitches = 0; p.cashoutMult = null;
+}
+/* аналитика не должна ронять раунд: запись события — best effort */
+function logLamp(p, on, mult, src){
+  p.lampSeq++;
+  try { q.addLamp.run(R.roundId, p.id, p.sessionId, p.lampSeq, on ? 1 : 0, mult, src, Date.now()); }
+  catch (e) { console.error('lamp event not logged:', e.message); }
 }
 function pubPlayer(p){
   return { nick: p.nick, bet: p.bet, on: p.lampOn,
@@ -249,7 +445,10 @@ function startRound(){
 
   /* free start ON — как у клиента: не тратит переключение */
   for (const p of players.values()){
-    if (p.bet){ p.lampOn = true; p.lampEver = true; p.persOnEntry = 1.0; p.persAccum = 1.0; }
+    if (p.bet){
+      p.lampOn = true; p.lampEver = true; p.persOnEntry = 1.0; p.persAccum = 1.0;
+      logLamp(p, 1, 1.0, 'free');            // бесплатный старт: событие есть, переключение не тратится
+    }
   }
   broadcast({ t: 'started', roundId: R.roundId, startTime: R.startTime, serverNow: Date.now() });
   console.log(`[round ${R.roundId}] seed mode ${R.seedMode}, ${R.clientSeeds.length} client seed(s)`);
@@ -280,7 +479,10 @@ function crashRound(){
     }
     p.settled = true;
     const payout = p.win ? p.bet * p.finalMult : 0;
-    q.addBet.run(p.id, R.roundId, today, p.bet, p.finalMult, p.win ? 1 : 0, payout, Date.now());
+    q.addBet.run(p.id, R.roundId, today, p.bet, p.finalMult, p.win ? 1 : 0, payout, Date.now(),
+                 p.sessionId, R.crashPoint, p.cashoutMult,
+                 E.MAX_SWITCHES - p.switchesLeft, p.onCount, p.offCount,
+                 p.offCount > 0 ? 1 : 0, p.autoBet, p.autoSwitches, 0);
   }
 
   q.addRound.run(R.roundId, R.hash, R.serverSeed, R.crashPoint, R.endedAt,
@@ -301,30 +503,36 @@ function crashRound(){
 }
 
 /* ── ДЕЙСТВИЯ ИГРОКА ──────────────────────────────────────────────── */
-function handleBet(p, amount){
+function handleBet(p, amount, auto){
   if (R.phase !== 'STARTING' || p.bet) return;
   const a = Math.floor(Number(amount));
   if (!Number.isFinite(a) || a < 1) return;
   p.bet = Math.min(a, E.MAX_BET);
+  p.autoBet = auto ? 1 : 0;            // чисто аналитический признак, на расчёт не влияет
   broadcast({ t: 'bet', nick: p.nick, amount: p.bet });
 }
-function handleLamp(p, on, claimedMult){
+function handleLamp(p, on, claimedMult, src){
   if (R.phase !== 'IN_PROGRESS' || !p.bet || p.settled) return;
   /* анти-чит: клиентская заявка множителя не может опережать серверный таймлайн */
   const sm = serverMult();
   let m = Number(claimedMult);
   if (!Number.isFinite(m) || m < 1) m = sm;
   m = Math.min(m, sm);
+  const source = src === 'auto' ? 'auto' : 'manual';
   if (on){
     if (p.lampOn || p.switchesLeft <= 0) return;
     p.lampOn = true; p.lampEver = true;
     p.switchesLeft--; p.persOnEntry = Math.max(m, 1);
+    p.onCount++;
   } else {
     if (!p.lampOn) return;
     const gain = p.persOnEntry > 0 ? Math.max(m, p.persOnEntry) / p.persOnEntry : 1.0;
     p.persAccum *= gain;
     p.lampOn = false; p.persOnEntry = m;
+    p.offCount++; p.cashoutMult = m;   // глобальный множитель в момент фиксации (последний OFF)
   }
+  if (source === 'auto') p.autoSwitches++;
+  logLamp(p, p.lampOn, m, source);
   broadcast({ t: 'lamp', nick: p.nick, on: p.lampOn,
               persAccum: p.persAccum, persOnEntry: p.persOnEntry });
 }
@@ -365,15 +573,18 @@ function handlePF(ws, limit){
   send(ws, { t: 'pf', rows });
 }
 
-/* ── СУТОЧНЫЙ СБРОС + ЧИСТКА ──────────────────────────────────────────
-   История ставок хранится по календарному дню (RESET_TZ): выборка всегда
-   за «сегодня», а строки прошлых дней физически удаляются фоновой чисткой.
-   Данные в SQLite → сегодняшняя история переживает рестарт сервера. */
+/* ── ЧИСТКА ПО СРОКУ ХРАНЕНИЯ ─────────────────────────────────────────
+   Всё живёт RETENTION_DAYS суток — этого требуют окна дашборда 1д/7д/30д.
+   «My Game History» по-прежнему суточная: она отбирает строки по day =
+   сегодня (RESET_TZ), а не полагается на удаление вчерашних. */
 setInterval(() => {
   try {
-    q.purgeBets.run(dayStr());
-    const m = q.maxRound.get().m;
-    if (m > 600) q.purgeRounds.run(m - 600);
+    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    q.purgeBets.run(cutoff);
+    q.purgeRounds.run(cutoff);
+    q.purgeLamp.run(cutoff);
+    q.purgeSess.run(cutoff);
+    q.sweepSess.run(Date.now() - SESSION_IDLE_MS);
   } catch (e) { console.error('purge failed:', e.message); }
 }, 10 * 60 * 1000);
 
@@ -409,9 +620,14 @@ const server = http.createServer((req, res) => {
 /* ── WEBSOCKET ────────────────────────────────────────────────────── */
 wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+  /* сырой IP дальше этой строки не живёт: в замыкании остаются только хеш и гео */
+  const net = (() => { const ip = clientIp(req); return { hash: ipHash(ip), ...geoLookup(ip) }; })();
+  ws.on('pong', () => {
+    ws.isAlive = true;
+    if (ws.sessionId) q.touchSess.run(Date.now(), ws.sessionId);   // ws-пинг раз в 30 с двигает «время в игре»
+  });
   let me = null;                       // P после hello
 
   ws.on('message', (raw) => {
@@ -428,6 +644,7 @@ wss.on('connection', (ws) => {
       me.sockets.add(ws);
       me.clientSeed = sanitizeSeed(msg.clientSeed);   // персональный provably-fair seed игрока
       ws.clientId = clientId;
+      me.sessionId = ws.sessionId = openSession(clientId, net);
       const ended = R.phase === 'ENDED';
       send(ws, {
         t: 'hello', serverNow: Date.now(), nick: me.nick,
@@ -444,10 +661,13 @@ wss.on('connection', (ws) => {
       });
       return;
     }
-    if (msg.t === 'ping'){ send(ws, { t: 'pong', now: msg.now, serverNow: Date.now() }); return; }
+    if (msg.t === 'ping'){
+      if (ws.sessionId) q.touchSess.run(Date.now(), ws.sessionId);
+      send(ws, { t: 'pong', now: msg.now, serverNow: Date.now() }); return;
+    }
     if (!me) return;                   // остальные сообщения — только после hello
-    if (msg.t === 'bet')       handleBet(me, msg.amount);
-    else if (msg.t === 'lamp') handleLamp(me, !!msg.on, msg.mult);
+    if (msg.t === 'bet')       handleBet(me, msg.amount, msg.auto);
+    else if (msg.t === 'lamp') handleLamp(me, !!msg.on, msg.mult, msg.src);
     else if (msg.t === 'myhistory') handleMyHistory(me, ws);
     else if (msg.t === 'seed')      me.clientSeed = sanitizeSeed(msg.clientSeed);   // игрок сменил client seed
     else if (msg.t === 'pf')        handlePF(ws, msg.limit);
@@ -458,6 +678,12 @@ wss.on('connection', (ws) => {
     me.sockets.delete(ws);
     /* состояние раунда держим до конца раунда даже при обрыве —
        переподключившийся игрок продолжит с того же места */
+    if (me.sockets.size === 0 && me.sessionId){
+      /* закрыли последнюю вкладку — сессия помечается завершённой, но возврат
+         в пределах SESSION_IDLE_MS снова снимет ended_at (та же строка) */
+      const now = Date.now();
+      q.endSess.run(now, now, me.sessionId);
+    }
   });
 });
 

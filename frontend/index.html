@@ -3065,12 +3065,14 @@ function startRound(startLocal){
 }
 
 /* ── LAMP CONTROLS ────────────────────────────────────────────────── */
-function lampOn(){
+/* src — кто дёрнул лампу: кнопка игрока ('manual') или автопилот ('auto').
+   Признак чисто аналитический: сервер всё равно валидирует множитель сам. */
+function lampOn(src){
   if (G.phase !== 'IN_PROGRESS' || G.switchesLeft <= 0 || G.lampOn || !G.bet) return;
   G.lampOn = true; G.lampEver = true;
   G.switchesLeft--; G.switchesUsed++;
   G.persOnEntry = currentGlobalMult();
-  netSend({ t: 'lamp', on: true, mult: G.persOnEntry });   // сервер валидирует и покажет остальным
+  netSend({ t: 'lamp', on: true, mult: G.persOnEntry, src: src || 'manual' });   // сервер валидирует и покажет остальным
   animLamp(true, false);
   sfx('lamp_on', .8);
   updSwitches();
@@ -3078,13 +3080,13 @@ function lampOn(){
   syncLampButtons();
   updPersonal();
 }
-function lampOff(){
+function lampOff(src){
   if (G.phase !== 'IN_PROGRESS' || !G.lampOn) return;
   const nowG = currentGlobalMult();
   const gain = G.persOnEntry > 0 ? nowG / G.persOnEntry : 1.0;
   G.persAccum *= gain;
   G.lampOn = false; G.persOnEntry = nowG;
-  netSend({ t: 'lamp', on: false, mult: nowG });           // сервер валидирует и покажет остальным
+  netSend({ t: 'lamp', on: false, mult: nowG, src: src || 'manual' });           // сервер валидирует и покажет остальным
   animLamp(false, false);
   sfx('lamp_off', .8);
   setBadge(`OFF · ×${G.persAccum.toFixed(2)} locked`, 'var(--p)');
@@ -3147,8 +3149,8 @@ function processAuto(curMult){
     if (a.fired) continue;
     if (curMult + 1e-9 >= a.m){
       a.fired = true;
-      if (a.type === 'off'){ if (G.lampOn) lampOff(); }
-      else { if (!G.lampOn && G.switchesLeft > 0) lampOn(); }
+      if (a.type === 'off'){ if (G.lampOn) lampOff('auto'); }
+      else { if (!G.lampOn && G.switchesLeft > 0) lampOn('auto'); }
     } else break;
   }
 }
@@ -3229,7 +3231,8 @@ function placeBet(){
   if (a > MAX_BET){ $('betAmt').value = MAX_BET; $('betNote').textContent = 'maximum $' + MAX_BET; return; }
   if (a > G.bal){ $('betNote').textContent = 'insufficient balance'; return; }
   G.bal -= a; G.bet = a;
-  netSend({ t: 'bet', amount: a });  // ставка попадает в общий стол (лидерборд у всех)
+  // ставка попадает в общий стол (лидерборд у всех); auto — был ли включён автопилот в момент ставки
+  netSend({ t: 'bet', amount: a, auto: !!$('autoEnable').checked });
   updBal();
   sfx('bet', .7);
   const bb = $('betBtn');

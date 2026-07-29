@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>VOLTA — аналитика</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Cpath d='M7 22h4v4H7zm7-8h4v12h-4zm7-6h4v18h-4z' fill='%23d8a13a'/%3E%3C/svg%3E">
+<style>
+/* Внутренний инструмент: приоритет — читаемость чисел, не эффектность.
+   Тёмная тема ради консистентности с игрой, но спокойнее: без свечения,
+   без анимаций, системный шрифт вместо Jost. */
+:root{
+  --bg:#0e1116; --panel:#161b22; --panel2:#1c222b; --brd:#262d38;
+  --txt:#e6edf3; --t2:#9aa4b2; --t3:#6e7781;
+  --acc:#d8a13a; --good:#3fb950; --bad:#f85149; --info:#58a6ff;
+  --rad:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--txt); font-size:14px; line-height:1.5;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+/* табличные цифры: колонки чисел не «пляшут» при обновлении */
+.num,table,.big,.mid{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--info)}
+
+/* ── ЛОГИН ─────────────────────────────────────────────────────────── */
+#login{min-height:100dvh;display:grid;place-items:center;padding:24px}
+.login-card{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--brd);
+  border-radius:var(--rad);padding:28px}
+.login-card h1{font-size:18px;letter-spacing:.02em}
+.login-card p{color:var(--t2);font-size:13px;margin:6px 0 20px}
+.login-card label{display:block;font-size:12px;color:var(--t2);margin-bottom:6px}
+input[type=password]{width:100%;padding:10px 12px;background:var(--bg);color:var(--txt);
+  border:1px solid var(--brd);border-radius:8px;outline:none}
+input[type=password]:focus{border-color:var(--acc)}
+.btn{width:100%;margin-top:14px;padding:10px 12px;background:var(--acc);color:#1a1205;
+  border:none;border-radius:8px;font-weight:600}
+.btn:disabled{opacity:.6;cursor:default}
+.err{margin-top:12px;color:var(--bad);font-size:13px;min-height:19px}
+
+/* ── КАРКАС ────────────────────────────────────────────────────────── */
+#app{display:none;max-width:1240px;margin:0 auto;padding:20px 20px 64px}
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding-bottom:16px;border-bottom:1px solid var(--brd);margin-bottom:22px}
+.brand{font-size:16px;font-weight:600;letter-spacing:.04em}
+.brand span{color:var(--acc)}
+.spacer{flex:1}
+.periods{display:flex;background:var(--panel);border:1px solid var(--brd);border-radius:8px;overflow:hidden}
+.periods button{padding:6px 14px;background:none;border:none;color:var(--t2);font-size:13px}
+.periods button[aria-pressed=true]{background:var(--panel2);color:var(--txt);font-weight:600}
+.ghost{padding:6px 12px;background:none;border:1px solid var(--brd);border-radius:8px;
+  color:var(--t2);font-size:13px}
+.ghost:hover{color:var(--txt);border-color:var(--t3)}
+
+.note{background:var(--panel);border:1px solid var(--brd);border-left:3px solid var(--acc);
+  border-radius:6px;padding:10px 14px;color:var(--t2);font-size:13px;margin-bottom:20px}
+.note b{color:var(--txt)}
+
+section{margin-bottom:26px}
+.sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.sec-head h2{font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--t2)}
+.sec-head .hint{font-size:12px;color:var(--t3)}
+
+/* align-items:start — карточки не растягиваются под самую высокую в ряду:
+   иначе под короткими зияет пустота в пол-экрана */
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}
+.card{background:var(--panel);border:1px solid var(--brd);border-radius:var(--rad);padding:16px 18px}
+.card h3{font-size:13px;color:var(--t2);font-weight:500;margin-bottom:12px}
+.big{font-size:32px;font-weight:600;line-height:1.1}
+.mid{font-size:20px;font-weight:600}
+.sub{font-size:12px;color:var(--t3);margin-top:4px}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px}
+.kv+.kv{border-top:1px solid var(--brd)}
+.kv span:first-child{color:var(--t2)}
+.muted-block{margin-top:12px;padding-top:10px;border-top:1px dashed var(--brd);
+  color:var(--t3);font-size:12px}
+.muted-block .mv{color:var(--t2);font-variant-numeric:tabular-nums}
+
+/* полоса сравнения двух долей */
+.bar{height:10px;border-radius:5px;background:var(--panel2);overflow:hidden;display:flex;margin:10px 0 8px}
+.bar i{display:block;height:100%}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--t2);flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+
+/* шкала RTP с референсной линией теоретического значения */
+.gauge{position:relative;height:12px;background:var(--panel2);border-radius:6px;margin:14px 0 6px}
+.gauge i{display:block;height:100%;border-radius:6px;background:var(--info)}
+.gauge u{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--acc);text-decoration:none}
+.gauge-lab{display:flex;justify-content:space-between;font-size:11px;color:var(--t3)}
+
+.donut{display:flex;align-items:center;gap:18px}
+.donut svg{flex:0 0 auto}
+
+/* ── ТАБЛИЦА ───────────────────────────────────────────────────────── */
+.tbl-wrap{background:var(--panel);border:1px solid var(--brd);border-radius:var(--rad);overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:820px}
+th,td{padding:10px 14px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+thead th{color:var(--t2);font-weight:500;font-size:12px;border-bottom:1px solid var(--brd);
+  position:sticky;top:0;background:var(--panel)}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--txt)}
+th .arr{color:var(--acc);font-size:10px}
+tbody tr+tr td{border-top:1px solid var(--brd)}
+tbody tr:hover td{background:var(--panel2)}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:var(--t2)}
+.pager{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--brd);
+  color:var(--t2);font-size:12px}
+.empty{padding:26px;text-align:center;color:var(--t3);font-size:13px}
+.loading{color:var(--t3);font-size:13px}
+.fail{color:var(--bad);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- ── ЭКРАН ВХОДА ──────────────────────────────────────────────────── -->
+<div id="login">
+  <form class="login-card" id="loginForm">
+    <h1>VOLTA · аналитика</h1>
+    <p>Внутренний дашборд. Доступ по паролю.</p>
+    <label for="pw">Пароль</label>
+    <input type="password" id="pw" autocomplete="current-password" required autofocus>
+    <button class="btn" id="loginBtn" type="submit">Войти</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- ── ДАШБОРД ──────────────────────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <div class="brand">VOLTA <span>·</span> аналитика</div>
+    <div class="spacer"></div>
+    <div class="periods" role="group" aria-label="Период">
+      <button data-p="1d" aria-pressed="true">24 часа</button>
+      <button data-p="7d" aria-pressed="false">7 дней</button>
+      <button data-p="1m" aria-pressed="false">30 дней</button>
+    </div>
+    <button class="ghost" id="refreshBtn">Обновить</button>
+    <button class="ghost" id="logoutBtn">Выйти</button>
+  </header>
+
+  <div class="note" id="sample"></div>
+
+  <section>
+    <div class="sec-head"><h2>Раунды и выплаты</h2>
+      <div class="hint" id="winHint"></div></div>
+    <div class="grid">
+      <div class="card" id="cardMult"></div>
+      <div class="card" id="cardRtp"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Поведение игроков</h2></div>
+    <div class="grid">
+      <div class="card" id="cardLamp"></div>
+      <div class="card" id="cardAuto"></div>
+      <div class="card" id="cardCashout"></div>
+      <div class="card" id="cardOutcome"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Игроки</h2>
+      <div class="hint">за выбранный период</div></div>
+    <div class="tbl-wrap">
+      <table id="playersTbl">
+        <thead><tr>
+          <th>Игрок</th>
+          <th>Anonymized ID</th>
+          <th>Страна</th>
+          <th class="sortable" data-s="bets">Ставок</th>
+          <th class="sortable" data-s="volume">Объём</th>
+          <th class="sortable" data-s="payout">Выплаты</th>
+          <th class="sortable" data-s="rtp">RTP</th>
+          <th class="sortable" data-s="winrate">Winrate</th>
+          <th>Сессий</th>
+          <th class="sortable" data-s="playtime">Время в игре</th>
+        </tr></thead>
+        <tbody id="playersBody"></tbody>
+      </table>
+      <div class="pager" id="playersPager"></div>
+    </div>
+    <div class="note" style="margin-top:12px;border-left-color:var(--t3)">
+      <b>Anonymized ID</b> — это не IP-адрес. В базе хранится только
+      SHA-256 от адреса с серверной солью: он различает уникальных
+      посетителей и повторные визиты, но развернуть его обратно в адрес нельзя.
+      Сырые IP не сохраняются нигде.
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+/* Токен живёт ТОЛЬКО в памяти вкладки: он и так протухает за 12 часов и не
+   переживает рестарт бэкенда, поэтому класть его в localStorage значило бы
+   рисовать «долгую сессию», которой нет. Любой 401 → сразу экран входа,
+   без попыток тихо переподключиться. */
+const API = '/api/dashboard';
+let TOKEN = null;
+let period = '1d';
+const players = { limit: 50, offset: 0, sort: 'volume', dir: 'desc' };
+
+const $ = (id) => document.getElementById(id);
+
+/* ── ФОРМАТИРОВАНИЕ ─────────────────────────────────────────────────── */
+const dash = '—';
+const pct   = (v, digits = 1) => (v === null || v === undefined ? dash : (v * 100).toFixed(digits) + '%');
+const mult  = (v) => (v === null || v === undefined ? dash : '×' + Number(v).toFixed(2));
+const money = (v) => (v === null || v === undefined ? dash : '$' + Number(v).toFixed(2));
+const int   = (v) => (v === null || v === undefined ? dash : String(v));
+const signed = (v) => (v === null || v === undefined ? dash : (v > 0 ? '+' : '') + Number(v).toFixed(2));
+
+function duration(ms){
+  if (ms === null || ms === undefined) return dash;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + ' с';
+  const m = Math.floor(s / 60);
+  if (m < 60) return (s % 60) ? `${m} мин ${s % 60} с` : `${m} мин`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return (m % 60) ? `${h} ч ${m % 60} мин` : `${h} ч`;
+  const d = Math.floor(h / 24);
+  return (h % 24) ? `${d} д ${h % 24} ч` : `${d} д`;
+}
+const esc = (s) => String(s === null || s === undefined ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ── СЕТЬ ───────────────────────────────────────────────────────────── */
+class Unauthorized extends Error {}
+
+async function api(path){
+  const r = await fetch(API + path, { headers: { Authorization: 'Bearer ' + TOKEN } });
+  if (r.status === 401) throw new Unauthorized('unauthorized');
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || ('HTTP ' + r.status));
+  return body;
+}
+
+async function login(password){
+  const r = await fetch(API + '/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok){
+    if (b.error === 'bad_password') throw new Error('Неверный пароль');
+    if (b.error === 'too_many_attempts')
+      throw new Error(`Слишком много попыток. Подождите ${Math.ceil((b.retryAfterMs || 0) / 60000)} мин`);
+    if (b.error === 'dashboard_disabled') throw new Error('Дашборд отключён на сервере (нет DASHBOARD_PASSWORD)');
+    throw new Error('Не удалось войти: ' + (b.error || r.status));
+  }
+  TOKEN = b.token;
+}
+
+function showLogin(message){
+  TOKEN = null;
+  $('app').style.display = 'none';
+  $('login').style.display = 'grid';
+  $('loginErr').textContent = message || '';
+  $('pw').value = '';
+  $('pw').focus();
+}
+function showApp(){
+  $('login').style.display = 'none';
+  $('app').style.display = 'block';
+}
+
+/* ── КАРТОЧКИ ───────────────────────────────────────────────────────── */
+function donut(shareA, colorA, colorB, size = 96){
+  /* круг из двух дуг: stroke-dasharray без библиотек и без канваса */
+  const r = (size - 14) / 2, c = 2 * Math.PI * r;
+  const a = Math.max(0, Math.min(1, shareA || 0)) * c;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${colorB}" stroke-width="12"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${colorA}" stroke-width="12"
+            stroke-dasharray="${a} ${c - a}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+  </svg>`;
+}
+
+function renderMult(d){
+  $('cardMult').innerHTML = `
+    <h3>Множитель раунда</h3>
+    <div class="row">
+      <div><div class="big">${mult(d.max)}</div><div class="sub">максимум за период</div></div>
+      <div><div class="mid">${mult(d.avg)}</div><div class="sub">средний</div></div>
+    </div>
+    <div class="kv" style="margin-top:14px">
+      <span>Мгновенные крахи ×1.00</span>
+      <span class="num">${int(d.instantBusts)} из ${int(d.rounds)} (${pct(d.rounds ? d.instantBusts / d.rounds : null)})</span>
+    </div>`;
+}
+
+function renderRtp(d){
+  /* шкала 0…120%: фактический — заливка, теоретический — вертикальная риска */
+  const scale = 1.2;
+  const w = Math.max(0, Math.min(1, (d.actualRtp || 0) / scale)) * 100;
+  const t = Math.max(0, Math.min(1, d.theoreticalRtp / scale)) * 100;
+  $('cardRtp').innerHTML = `
+    <h3>RTP</h3>
+    <div class="row">
+      <div><div class="big">${pct(d.actualRtp, 2)}</div><div class="sub">actual (live)</div></div>
+      <div><div class="mid" style="color:var(--acc)">${pct(d.theoreticalRtp, 2)}</div>
+           <div class="sub">theoretical (audited)</div></div>
+    </div>
+    <div class="gauge"><i style="width:${w}%"></i><u style="left:${t}%" title="theoretical (audited)"></u></div>
+    <div class="gauge-lab"><span>0%</span><span>риска — теоретический RTP</span><span>120%</span></div>
+    <div class="kv" style="margin-top:10px"><span>Ставок / объём</span>
+      <span class="num">${int(d.bets)} · ${money(d.volume)}</span></div>
+    <div class="kv"><span>Выплачено</span><span class="num">${money(d.payout)}</span></div>`;
+}
+
+function renderLamp(d){
+  const share = d.shareWithOff;
+  $('cardLamp').innerHTML = `
+    <h3>Использование лампы</h3>
+    <div class="donut">
+      ${donut(share, 'var(--good)', 'var(--panel2)')}
+      <div>
+        <div class="mid">${pct(share)}</div>
+        <div class="sub">ставок хотя бы с одним OFF</div>
+        <div class="legend" style="margin-top:10px">
+          <span><i style="background:var(--good)"></i>с OFF: ${int(d.withOff)}</span>
+          <span><i style="background:var(--panel2)"></i>без: ${int(d.withoutOff)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="kv" style="margin-top:14px">
+      <span>Израсходовано переключений</span>
+      <span class="num">${pct(d.avgSwitchUsage)} — в среднем ${d.avgSwitchesUsed === null ? dash : d.avgSwitchesUsed}
+        из ${int(d.maxSwitches)} доступных</span>
+    </div>`;
+}
+
+/* При нуле ставок доля равна нулю, и обычная полоса залилась бы вторым цветом
+   на всю ширину — то есть показала бы «100% чего-то», чего на деле нет.
+   Поэтому пустая выборка рисуется одной нейтральной полосой. */
+function bar(share, colorA, colorB, total){
+  if (!total) return `<div class="bar"><i style="width:100%;background:var(--panel2)"></i></div>`;
+  const a = Math.max(0, Math.min(1, share || 0)) * 100;
+  return `<div class="bar"><i style="width:${a}%;background:${colorA}"></i>
+                           <i style="width:${100 - a}%;background:${colorB}"></i></div>`;
+}
+
+function renderAuto(d){
+  $('cardAuto').innerHTML = `
+    <h3>Автопилот</h3>
+    <div class="row">
+      <div><div class="big">${pct(d.shareWithAutoSwitch)}</div>
+           <div class="sub">ставок, где автопилот дёргал лампу</div></div>
+    </div>
+    ${bar(d.shareWithAutoSwitch, 'var(--info)', 'var(--panel2)', d.bets)}
+    <div class="legend">
+      <span><i style="background:var(--info)"></i>автопилот: ${int(d.withAutoSwitch)}</span>
+      <span><i style="background:var(--panel2)"></i>полностью вручную: ${int(d.fullyManual)}</span>
+    </div>
+    <div class="muted-block">
+      Включён при ставке: <span class="mv">${int(d.withAutopilotEnabled)}</span>
+      (${pct(d.shareWithAutopilotEnabled)}). Расходится с верхним числом, когда
+      раунд рухнул раньше первой ступени плана: автопилот был включён, а
+      переключить ничего не успел.
+    </div>`;
+}
+
+function renderCashout(d){
+  const c = d.cashoutVsCrash, f = d.finalVsCrash;
+  $('cardCashout').innerHTML = `
+    <h3>Выход против пика</h3>
+    <div class="row">
+      <div><div class="big">${pct(c.avgRatio)}</div>
+           <div class="sub">пика раунда забирал средний выход</div></div>
+    </div>
+    <div class="kv" style="margin-top:12px"><span>Средний выход через лампу</span>
+      <span class="num">${mult(c.avgCashoutMult)}</span></div>
+    <div class="kv"><span>Средний пик тех же раундов</span><span class="num">${mult(c.avgCrashMult)}</span></div>
+    <div class="kv"><span>Отклонение от пика</span>
+      <span class="num" style="color:${c.avgDeviation < 0 ? 'var(--bad)' : 'var(--good)'}">${signed(c.avgDeviation)}</span></div>
+    <div class="kv"><span>Ставок с фиксацией</span><span class="num">${int(c.bets)} из ${int(d.bets)}</span></div>
+    <div class="muted-block">
+      Выплатной множитель против пика: <span class="mv">${signed(f.avgDeviation)}</span>.
+      Смотреть на него отдельно нельзя: у сгоревших ставок он равен нулю
+      по построению (накопленный множитель совпадает с точкой краха), поэтому
+      число занижает реальные потери и само по себе ни о чём не говорит.
+    </div>`;
+}
+
+function renderOutcome(d){
+  const x = d.distribution;
+  $('cardOutcome').innerHTML = `
+    <h3>Исходы ставок</h3>
+    <div class="row">
+      <div><div class="big" style="color:var(--good)">${pct(x.cashedOutShare)}</div>
+           <div class="sub">зафиксировались</div></div>
+      <div><div class="mid" style="color:var(--bad)">${pct(x.bustedShare)}</div>
+           <div class="sub">сгорели</div></div>
+    </div>
+    ${bar(x.cashedOutShare, 'var(--good)', 'var(--bad)', d.bets)}
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>вышли вовремя: ${int(x.cashedOut)}</span>
+      <span><i style="background:var(--bad)"></i>держали до краха: ${int(x.busted)}</span>
+    </div>
+    <div class="kv" style="margin-top:12px"><span>Всего ставок</span><span class="num">${int(d.bets)}</span></div>`;
+}
+
+function renderPlayers(d){
+  const body = $('playersBody');
+  if (!d.players.length){
+    body.innerHTML = `<tr><td colspan="10" class="empty">За выбранный период игроков нет</td></tr>`;
+  } else {
+    body.innerHTML = d.players.map(p => `<tr>
+      <td>${esc(p.nick || dash)}</td>
+      <td class="mono" title="SHA-256 от IP с серверной солью, не адрес">${p.ipHash ? esc(p.ipHash.slice(0, 12)) + '…' : dash}</td>
+      <td>${esc(p.country || dash)}</td>
+      <td class="num">${int(p.bets)}</td>
+      <td class="num">${money(p.volume)}</td>
+      <td class="num">${money(p.payout)}</td>
+      <td class="num">${pct(p.rtp)}</td>
+      <td class="num">${pct(p.winrate)}</td>
+      <td class="num">${int(p.sessions)}</td>
+      <td class="num">${duration(p.playtimeMs)}</td>
+    </tr>`).join('');
+  }
+  const from = d.total ? d.offset + 1 : 0, to = Math.min(d.offset + d.limit, d.total);
+  $('playersPager').innerHTML = `
+    <button class="ghost" id="prevBtn" ${d.offset === 0 ? 'disabled' : ''}>← Назад</button>
+    <button class="ghost" id="nextBtn" ${to >= d.total ? 'disabled' : ''}>Вперёд →</button>
+    <span>${from}–${to} из ${d.total}</span>`;
+  const prev = $('prevBtn'), next = $('nextBtn');
+  if (prev) prev.onclick = () => { players.offset = Math.max(0, players.offset - players.limit); load(); };
+  if (next) next.onclick = () => { players.offset += players.limit; load(); };
+
+  document.querySelectorAll('th.sortable').forEach(th => {
+    const key = th.dataset.s;
+    th.innerHTML = th.textContent.replace(/ [▲▼]$/, '') +
+      (players.sort === key ? ` <span class="arr">${players.dir === 'desc' ? '▼' : '▲'}</span>` : '');
+    th.onclick = () => {
+      if (players.sort === key) players.dir = players.dir === 'desc' ? 'asc' : 'desc';
+      else { players.sort = key; players.dir = 'desc'; }
+      players.offset = 0;
+      load();
+    };
+  });
+}
+
+/* ── ЗАГРУЗКА ───────────────────────────────────────────────────────── */
+function setBusy(on){
+  $('refreshBtn').disabled = on;
+  $('refreshBtn').textContent = on ? 'Загрузка…' : 'Обновить';
+}
+
+async function load(){
+  setBusy(true);
+  try {
+    const q = '?period=' + period;
+    const [mult_, rtp, lamp, auto, pvc, pl] = await Promise.all([
+      api('/multiplier-stats' + q),
+      api('/rtp' + q),
+      api('/lamp-usage' + q),
+      api('/autopilot-adoption' + q),
+      api('/personal-vs-crash' + q),
+      api(`/players${q}&limit=${players.limit}&offset=${players.offset}&sort=${players.sort}&dir=${players.dir}`),
+    ]);
+    renderMult(mult_); renderRtp(rtp); renderLamp(lamp);
+    renderAuto(auto); renderCashout(pvc); renderOutcome(pvc); renderPlayers(pl);
+
+    const win = new Date(mult_.from);
+    $('winHint').textContent = `окно с ${win.toLocaleString('ru-RU')}`;
+
+    /* На малой выборке доли скачут на десятки процентов от одной ставки —
+       честнее предупредить, чем показывать «100%» без оговорки. */
+    const n = rtp.bets;
+    $('sample').style.display = n < 30 ? 'block' : 'none';
+    if (n < 30){
+      $('sample').innerHTML = n === 0
+        ? `<b>За период нет ни одной ставки.</b> Разделы с долями пустые — это не ошибка:
+           аналитика копится с момента внедрения схемы, история задним числом не восстанавливается.
+           Раунды при этом идут и считаются (${int(mult_.rounds)} за период).`
+        : `<b>Маленькая выборка: ${int(n)} ${n === 1 ? 'ставка' : n < 5 ? 'ставки' : 'ставок'}.</b>
+           Проценты и средние ниже статистически незначимы — одна ставка сдвигает долю на
+           ${pct(1 / n, 0)}. Раундов за период: ${int(mult_.rounds)}.`;
+    }
+  } catch (e) {
+    if (e instanceof Unauthorized){ showLogin('Сессия истекла — войдите заново'); return; }
+    $('sample').style.display = 'block';
+    $('sample').innerHTML = `<b class="fail">Не удалось загрузить данные:</b> ${esc(e.message)}`;
+  } finally {
+    setBusy(false);
+  }
+}
+
+/* ── СОБЫТИЯ ────────────────────────────────────────────────────────── */
+$('loginForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const btn = $('loginBtn');
+  btn.disabled = true; $('loginErr').textContent = '';
+  try {
+    await login($('pw').value);
+    $('pw').value = '';
+    showApp();
+    await load();
+  } catch (e) {
+    $('loginErr').textContent = e.message;
+    $('pw').select();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('logoutBtn').addEventListener('click', async () => {
+  try { await fetch(API + '/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN } }); }
+  catch (e) { /* сеть отвалилась — токен всё равно забываем локально */ }
+  showLogin('Вы вышли');
+});
+
+$('refreshBtn').addEventListener('click', () => load());
+
+document.querySelectorAll('.periods button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (period === b.dataset.p) return;
+    period = b.dataset.p;
+    document.querySelectorAll('.periods button')
+      .forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    players.offset = 0;
+    load();
+  });
+});
+</script>
+</body>
+</html>

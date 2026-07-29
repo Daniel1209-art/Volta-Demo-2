@@ -47,6 +47,12 @@ systemctl reload nginx
 
 sleep 1
 systemctl is-active --quiet "$SERVICE" || { echo "ОШИБКА: $SERVICE не поднялся — journalctl -u $SERVICE -n 50"; exit 1; }
-curl -sf http://127.0.0.1:8090/api/health >/dev/null || { echo "ОШИБКА: health-check бэкенда не отвечает"; exit 1; }
+# бэкенд читает гео-базу ДО listen (≈4 с на базе DB-IP), поэтому health-check
+# ждёт готовности, а не бьёт один раз: иначе живой деплой выглядит как упавший
+for i in $(seq 1 30); do
+  curl -sf http://127.0.0.1:8090/api/health >/dev/null && break
+  [ "$i" -eq 30 ] && { echo "ОШИБКА: health-check бэкенда не отвечает"; exit 1; }
+  sleep 1
+done
 
 echo "OK: https://volta-demo.com обновлён ($(git -C "$SITE_DIR" rev-parse --short HEAD)), бэкенд жив"

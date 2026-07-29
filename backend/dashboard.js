@@ -149,6 +149,75 @@ function createDashboard({ dbPath, clientIp, ipHash, maxSwitches }){
   const routes = new Map();
   const badPeriod = (res) => json(res, 400, { error: 'bad_period', allowed: Object.keys(PERIODS) });
 
+  /* ── 1. ИГРОКИ ─────────────────────────────────────────────────────
+     Реальные игроки (is_bot = 0) с пагинацией. Попадает всякий, у кого в окне
+     есть хотя бы одна ставка ИЛИ хотя бы одна сессия: зашедший, но не
+     поставивший — тоже посетитель, у него просто нет RTP.
+     ip_hash и страна берутся из ПОСЛЕДНЕЙ сессии игрока: адрес может меняться.
+     Время в игре — сумма по сессиям, COALESCE(ended_at, last_seen_at) −
+     started_at (docs/analytics.md), склейка 30 минут уже учтена тем, что
+     возврат продолжает ту же строку sessions, а не заводит новую.
+     period необязателен: без него — вся сохранённая история (retention). */
+  const PLAYER_SORT = {
+    volume:   'COALESCE(b.volume, 0)',
+    bets:     'COALESCE(b.bets, 0)',
+    payout:   'COALESCE(b.payout, 0)',
+    rtp:      'CASE WHEN COALESCE(b.volume, 0) > 0 THEN b.payout / b.volume END',
+    winrate:  'CASE WHEN COALESCE(b.bets, 0) > 0 THEN CAST(b.wins AS REAL) / b.bets END',
+    playtime: 'COALESCE(s.playtime, 0)',
+  };
+  const PLAYERS_FROM = `
+    FROM players p
+    LEFT JOIN (SELECT player_id, COUNT(*) AS bets, SUM(amount) AS volume,
+                      SUM(payout) AS payout, SUM(win) AS wins
+               FROM bets WHERE created_at >= ? AND created_at <= ? AND is_bot = 0
+               GROUP BY player_id) b ON b.player_id = p.id
+    LEFT JOIN (SELECT player_id, COUNT(*) AS sessions, MAX(last_seen_at) AS lastSeen,
+                      SUM(COALESCE(ended_at, last_seen_at) - started_at) AS playtime
+               FROM sessions WHERE started_at >= ? AND started_at <= ? AND is_bot = 0
+               GROUP BY player_id) s ON s.player_id = p.id
+    WHERE b.player_id IS NOT NULL OR s.player_id IS NOT NULL`;
+
+  routes.set('players', (req, res, url) => {
+    const p = url.searchParams.get('period');
+    let from = 0, to = Date.now(), period = null;
+    if (p !== null){
+      const w = windowOf(url);
+      if (!w) return badPeriod(res);
+      ({ from, to, period } = w);
+    }
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
+    const offset = Math.max(0, parseInt(url.searchParams.get('offset'), 10) || 0);
+    const sortKey = url.searchParams.get('sort') || 'volume';
+    if (!(sortKey in PLAYER_SORT))
+      return json(res, 400, { error: 'bad_sort', allowed: Object.keys(PLAYER_SORT) });
+    const dir = (url.searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+    const args = [from, to, from, to];
+    const total = sql(`SELECT COUNT(*) AS c ${PLAYERS_FROM}`).get(...args).c;
+    const rows = sql(`
+      SELECT p.id AS playerId, p.nick,
+             (SELECT x.ip_hash FROM sessions x WHERE x.player_id = p.id ORDER BY x.started_at DESC LIMIT 1) AS ipHash,
+             (SELECT x.country FROM sessions x WHERE x.player_id = p.id ORDER BY x.started_at DESC LIMIT 1) AS country,
+             COALESCE(b.bets, 0) AS bets, COALESCE(b.volume, 0) AS volume,
+             COALESCE(b.payout, 0) AS payout, COALESCE(b.wins, 0) AS wins,
+             COALESCE(s.sessions, 0) AS sessions, COALESCE(s.playtime, 0) AS playtime, s.lastSeen
+      ${PLAYERS_FROM}
+      ORDER BY ${PLAYER_SORT[sortKey]} ${dir}, p.id ASC
+      LIMIT ? OFFSET ?`).all(...args, limit, offset);
+
+    json(res, 200, {
+      period, from, to, total, limit, offset,
+      players: rows.map(r => ({
+        playerId: r.playerId, nick: r.nick, ipHash: r.ipHash, country: r.country,
+        bets: r.bets, volume: round2(r.volume), payout: round2(r.payout),
+        rtp: share(r.payout, r.volume),
+        wins: r.wins, winrate: share(r.wins, r.bets),
+        sessions: r.sessions, playtimeMs: r.playtime, lastSeen: r.lastSeen,
+      })),
+    });
+  });
+
   /* ── 2. МНОЖИТЕЛИ УРОВНЯ РАУНДА ─────────────────────────────────────
      MAX и AVG глобального crash_point за окно — по времени КРАША раунда
      (rounds.crashed_at), а не по времени ставки. */

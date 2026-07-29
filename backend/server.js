@@ -207,70 +207,134 @@ function clientIp(req){
 }
 function ipHash(ip){ return ip ? crypto.createHash('sha256').update(IP_SALT + '|' + ip).digest('hex') : null; }
 
-/* IPv4 и IPv6 приводим к одной 32-символьной hex-шкале (v4 — как v4-mapped),
-   тогда диапазоны гео-таблицы сравниваются обычным строковым сравнением */
-function ipKey(ip){
-  if (!ip) return null;
+/* IPv4 и IPv6 приводим к одной 128-битной шкале (v4 — как v4-mapped): четыре
+   uint32, старшее слово первым. Границы диапазонов лежат в типизированных
+   массивах, а не строками: на реальной базе DB-IP (≈700 тыс. строк) строковый
+   индекс занимал 584 МБ RSS против ~55 МБ здесь. */
+function hex4(g){
+  if (g.length < 1 || g.length > 4) return -1;
+  let v = 0;
+  for (let i = 0; i < g.length; i++){
+    const c = g.charCodeAt(i);
+    let d;
+    if (c >= 48 && c <= 57) d = c - 48;            // 0-9
+    else if (c >= 97 && c <= 102) d = c - 87;      // a-f
+    else if (c >= 65 && c <= 70)  d = c - 55;      // A-F
+    else return -1;
+    v = v * 16 + d;
+  }
+  return v;
+}
+/* пишет адрес четырьмя словами в out[off..off+3]; false — адрес не разобран */
+function ipWords(ip, out, off){
+  if (!ip) return false;
   let s = String(ip).split('%')[0];                       // отбрасываем zone-id (fe80::1%eth0)
   if (s.startsWith('::ffff:') && s.includes('.')) s = s.slice(7);
   if (s.includes('.')){
     const p = s.split('.');
-    if (p.length !== 4) return null;
-    let hex = '';
-    for (const x of p){
-      const n = Number(x);
-      if (!Number.isInteger(n) || n < 0 || n > 255) return null;
-      hex += n.toString(16).padStart(2, '0');
+    if (p.length !== 4) return false;
+    let v = 0;
+    for (let i = 0; i < 4; i++){
+      const b = Number(p[i]);
+      if (!Number.isInteger(b) || b < 0 || b > 255) return false;
+      v = v * 256 + b;
     }
-    return '00000000000000000000ffff' + hex;
+    out[off] = 0; out[off + 1] = 0; out[off + 2] = 0xffff; out[off + 3] = v >>> 0;
+    return true;
   }
-  if (!s.includes(':')) return null;
+  if (!s.includes(':')) return false;
   let parts;
   if (s.includes('::')){
     const [head, tail = ''] = s.split('::');
     const a = head ? head.split(':') : [], b = tail ? tail.split(':') : [];
-    if (a.length + b.length > 8) return null;
+    if (a.length + b.length > 8) return false;
     parts = [...a, ...Array(8 - a.length - b.length).fill('0'), ...b];
   } else parts = s.split(':');
-  if (parts.length !== 8) return null;
-  let hex = '';
-  for (const g of parts){
-    if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
-    hex += g.toLowerCase().padStart(4, '0');
+  if (parts.length !== 8) return false;
+  for (let k = 0; k < 4; k++){
+    const g1 = hex4(parts[k * 2]), g2 = hex4(parts[k * 2 + 1]);
+    if (g1 < 0 || g2 < 0) return false;
+    out[off + k] = ((g1 << 16) | g2) >>> 0;
   }
-  return hex;
+  return true;
+}
+/* сравнение 128-битных ключей: запись ai массива a против записи bi массива b */
+function cmp4(a, ai, b, bi){
+  for (let k = 0; k < 4; k++){
+    const x = a[ai + k], y = b[bi + k];
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
 }
 
 /* Офлайновая гео-таблица: CSV-диапазонник (DB-IP lite «IP to Country» —
    start,end,country; либо city-уровень — start,end,continent,country,region,city).
-   Файла нет → страна/регион остаются NULL, всё остальное работает как обычно. */
+   Файла нет → страна/регион остаются NULL, всё остальное работает как обычно.
+   Названия стран/регионов интернируются: в записи лежит индекс, а не строка. */
 const GEO = (() => {
-  const rows = [];
-  try {
-    for (const line of fs.readFileSync(GEOIP_CSV, 'utf8').split('\n')){
-      const f = line.trim().replace(/"/g, '').split(',');
-      if (f.length < 3) continue;
-      const a = ipKey(f[0]), b = ipKey(f[1]);
-      if (!a || !b) continue;
-      rows.push(f.length >= 6 ? [a, b, f[3], f[4] || null] : [a, b, f[2], null]);
+  let txt;
+  try { txt = fs.readFileSync(GEOIP_CSV, 'utf8'); }
+  catch (e) { console.log(`geoip: ${GEOIP_CSV} не найден — страна/регион не заполняются`); return null; }
+  const t0 = Date.now();
+  let lines = 1;
+  for (let i = 0; i < txt.length; i++) if (txt.charCodeAt(i) === 10) lines++;
+  const lo = new Uint32Array(lines * 4), hi = new Uint32Array(lines * 4);
+  const cc = new Uint16Array(lines), rg = new Uint16Array(lines);
+  const names = [null], idxOf = new Map();               // 0 — «неизвестно»
+  const intern = (s) => {
+    if (!s) return 0;
+    let i = idxOf.get(s);
+    if (i === undefined){ i = names.length; names.push(s); idxOf.set(s, i); }
+    return i;
+  };
+  let n = 0, pos = 0;
+  while (pos < txt.length){                              // построчно, без разбиения файла в массив
+    let nl = txt.indexOf('\n', pos);
+    if (nl < 0) nl = txt.length;
+    let line = txt.slice(pos, nl);
+    pos = nl + 1;
+    if (line.indexOf('"') >= 0) line = line.replace(/"/g, '');
+    line = line.trim();
+    if (!line) continue;
+    const f = line.split(',');
+    if (f.length < 3) continue;
+    if (!ipWords(f[0], lo, n * 4) || !ipWords(f[1], hi, n * 4)) continue;
+    cc[n] = intern(f.length >= 6 ? f[3] : f[2]);
+    rg[n] = f.length >= 6 ? intern(f[4]) : 0;
+    n++;
+  }
+  /* бинарный поиск требует сортировки по началу диапазона; вендорский файл
+     обычно уже отсортирован, поэтому сначала проверяем и сортируем только при нужде */
+  let sorted = true;
+  for (let i = 1; i < n; i++) if (cmp4(lo, (i - 1) * 4, lo, i * 4) > 0){ sorted = false; break; }
+  if (!sorted){
+    const order = Array.from({ length: n }, (_, i) => i)
+      .sort((x, y) => cmp4(lo, x * 4, lo, y * 4));
+    const lo2 = new Uint32Array(n * 4), hi2 = new Uint32Array(n * 4);
+    const cc2 = new Uint16Array(n), rg2 = new Uint16Array(n);
+    for (let i = 0; i < n; i++){
+      const j = order[i];
+      lo2.set(lo.subarray(j * 4, j * 4 + 4), i * 4);
+      hi2.set(hi.subarray(j * 4, j * 4 + 4), i * 4);
+      cc2[i] = cc[j]; rg2[i] = rg[j];
     }
-    rows.sort((x, y) => x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
-    console.log(`geoip: ${rows.length} диапазонов из ${GEOIP_CSV}`);
-  } catch (e) {
-    console.log(`geoip: ${GEOIP_CSV} не найден — страна/регион не заполняются`);
+    console.log(`geoip: ${n} диапазонов из ${GEOIP_CSV} (отсортировано, ${Date.now() - t0}мс)`);
+    return { n, lo: lo2, hi: hi2, cc: cc2, rg: rg2, names };
   }
-  return rows;
+  console.log(`geoip: ${n} диапазонов из ${GEOIP_CSV} (${Date.now() - t0}мс)`);
+  return { n, lo, hi, cc, rg, names };
 })();
+const GEO_KEY = new Uint32Array(4);                      // лукап синхронный, буфер переиспользуется
 function geoLookup(ip){
-  const k = ipKey(ip);
-  if (!k || !GEO.length) return { country: null, region: null };
-  let lo = 0, hi = GEO.length - 1, hit = null;
-  while (lo <= hi){                                   // последний диапазон со start <= k
+  const none = { country: null, region: null };
+  if (!GEO || !GEO.n || !ipWords(ip, GEO_KEY, 0)) return none;
+  let lo = 0, hi = GEO.n - 1, hit = -1;
+  while (lo <= hi){                                      // последний диапазон со start <= key
     const mid = (lo + hi) >> 1;
-    if (GEO[mid][0] > k) hi = mid - 1; else { hit = GEO[mid]; lo = mid + 1; }
+    if (cmp4(GEO.lo, mid * 4, GEO_KEY, 0) > 0) hi = mid - 1; else { hit = mid; lo = mid + 1; }
   }
-  if (!hit || hit[1] < k) return { country: null, region: null };
-  return { country: hit[2] || null, region: hit[3] || null };
+  if (hit < 0 || cmp4(GEO.hi, hit * 4, GEO_KEY, 0) < 0) return none;
+  return { country: GEO.names[GEO.cc[hit]] || null, region: GEO.names[GEO.rg[hit]] || null };
 }
 
 /* ── СЕССИИ ───────────────────────────────────────────────────────────

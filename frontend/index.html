@@ -1269,9 +1269,19 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   .bet-zone{flex:1 0 auto;flex-direction:column;gap:clamp(10px,1.4vh,16px)}
   .bet-card{flex:0 0 auto}
   .lamp-ctrl{flex:1 0 auto}
-  .auto-card{display:flex;flex-direction:column;flex:2 0 auto;max-height:none}
+  /* (v19) КАРТОЧКА АВТОПИЛОТА — ПО СОДЕРЖИМОМУ. Было flex:2 0 auto у карточки
+     и flex:1 1 auto + align-content:space-between у грида: карточка тянулась
+     на свободную высоту рейки, а грид распихивал ступени по её краям. При
+     ЧЕТЫРЁХ ступенях излишек делился на три зазора и был почти незаметен; после
+     сокращения до двух (MAX_SWITCHES=2) весь излишек — на 1920x1080 это ~200px —
+     уходил в ЕДИНСТВЕННЫЙ зазор между ступенью 1 и ступенью 2 и читался как
+     дыра в вёрстке. Теперь карточка держит высоту содержимого, а свободные
+     пиксели рейки забирает пульт ON/OFF — ровно то распределение, которое
+     описано в v15 выше («главные кнопки игры»). Ритм отступов равномерный:
+     7px между ступенями (gap грида) и те же 7px до Final OFF (его margin-top). */
+  .auto-card{display:flex;flex-direction:column;flex:0 0 auto;max-height:none}
   .auto-card .auto-grid{grid-template-columns:1fr;overflow:visible;min-height:auto;
-    flex:1 1 auto;align-content:space-between}
+    flex:0 0 auto;align-content:start}
   /* the lamp fills the now tall/square zone */
   .lamp-card{flex:1 1 auto;display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:stretch}
   .lamp-outer{width:auto;height:100%;aspect-ratio:1;max-width:100%;max-height:min(70vh,680px);align-self:center}

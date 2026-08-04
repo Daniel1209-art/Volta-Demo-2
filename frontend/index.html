@@ -622,6 +622,11 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   background:var(--s2);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:7px 10px}
 .auto-status b{color:var(--p);font-weight:700}
 .auto-status .on{color:var(--g)}.auto-status .off{color:var(--pk)}
+/* подсказка о потолке раунда — у КОНКРЕТНОГО поля, не баннером на панель.
+   Ввод не блокируется, поэтому тон приглушённый, а не тревожный. */
+.as-warn{font-size:8px;line-height:1.4;color:var(--gold);letter-spacing:.02em;
+  display:flex;align-items:flex-start;gap:3px;padding:0 2px}
+.as-input.over-cap{border-color:color-mix(in srgb,var(--gold) 45%,transparent)}
 
 /* crash shake on the voltage zone + screen flash */
 @keyframes voltShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}60%{transform:translateX(2px)}}
@@ -2089,7 +2094,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
   </div>
 </div>
 
-<script src="shared/engine.js?v=2"></script>
+<script src="shared/engine.js?v=3"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    VOLTA — LAMP GAME CLIENT  (Bustabit-accurate math, provably fair)
@@ -2104,6 +2109,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 
 /* ── SHARED ENGINE — общий модуль клиента и сервера ────────────────── */
 const { TICK_RATE, AFTER_CRASH_MS, RESTART_MS, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
+        MAX_CRASH_MULTIPLIER, clampCrash,
         growthFunc, inverseGrowth, crashPointFromHash, sha256hex, randHex,
         combineClientSeeds, divisible } = window.VoltaEngine;
 /* ── STATE ────────────────────────────────────────────────────────── */
@@ -3138,6 +3144,29 @@ function buildAutoActions(){
   acts.sort((a, b) => a.m - b.m);
   return acts;
 }
+/* ── ПОТОЛОК РАУНДА В ПОЛЯХ АВТОПИЛОТА ────────────────────────────────
+   Раунд физически не может уйти выше ×MAX_CRASH_MULTIPLIER, поэтому порог
+   выше потолка не сработает никогда. Ввод НЕ блокируем — игрок вправе
+   оставить значение «про запас»; просто предупреждаем у того поля, где
+   ввели, а не общим баннером на всю панель. */
+function autoCapHint(el){
+  const v = parseDec(el.value);
+  const over = Number.isFinite(v) && v > MAX_CRASH_MULTIPLIER;
+  const box = el.parentNode;
+  let note = box.querySelector('.as-warn');
+  el.classList.toggle('over-cap', over);
+  if (!over){ if (note) note.remove(); return; }
+  if (!note){ note = document.createElement('div'); note.className = 'as-warn'; box.appendChild(note); }
+  note.innerHTML = `⚠ round tops out at &times;${MAX_CRASH_MULTIPLIER.toLocaleString('en-US')} `
+    + `&mdash; this step never fires`;
+}
+/* вешаем на все поля разом: так ни одно новое поле не забудет подсказку */
+function bindAutoCapHints(){
+  document.querySelectorAll('.as-input').forEach((el) => {
+    el.addEventListener('input', () => autoCapHint(el));
+    autoCapHint(el);                       // на случай значения, восстановленного браузером
+  });
+}
 function snapshotAuto(){
   G.auto.on = $('autoEnable').checked;
   G.auto.actions = G.auto.on ? buildAutoActions() : [];
@@ -3626,10 +3655,13 @@ function pfToggle(i){ const el = $('pfR' + i); if (el) el.classList.toggle('open
 /* независимый пересчёт: SHA-256 и HMAC-SHA256 через crypto.subtle (не движок),
    затем множитель по той же формуле — доказывает и hash, и crash-point */
 const _hexb = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+/* Потолок берётся из движка (clampCrash), а НЕ переписывается здесь: иначе
+   Verify и сервер разойдутся на раундах выше ×MAX_CRASH_MULTIPLIER и кнопка
+   начнёт показывать Mismatch там, где всё честно. Сама формула — прежняя. */
 function crashFromHmacHex(hash){
   if (divisible(hash, 40)) return 0;
   const h = parseInt(hash.slice(0, 13), 16), e = Math.pow(2, 52);
-  return Math.floor((100 * e - h) / (e - h));
+  return clampCrash(Math.floor((100 * e - h) / (e - h)));
 }
 async function verifyRound(i){
   const r = PF.rows[i]; const out = $('pfV' + i); if (!r || !out) return;
@@ -3653,6 +3685,7 @@ async function verifyRound(i){
 try {
   G.bal = 10000;
   updBal();
+  bindAutoCapHints();
   renderAutoStatus();
   // recolour the seeded history chips to the shared tier ramp
   document.querySelectorAll('.hist-bar .hc').forEach(c => {

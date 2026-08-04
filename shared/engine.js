@@ -22,6 +22,19 @@
   const MAX_BET        = 100;      // максимальная ставка игрока — $100
   const DISPLAY_TICK   = 50;
 
+  /* ── ПОТОЛКИ ────────────────────────────────────────────────────────
+     Это НЕ часть provably-fair математики: честный результат считается
+     формулой ниже без изменений, потолок применяется ПОВЕРХ него
+     последним шагом. Поэтому и сервер, и кнопка Verify обязаны звать
+     ОДНУ И ТУ ЖЕ функцию clampCrash — иначе Verify покажет Mismatch на
+     редких раундах выше потолка. Второй реализации потолка в проекте
+     быть не должно. */
+  const MAX_CRASH_MULTIPLIER = 10000;                        // потолок множителя раунда, ×
+  const MAX_CRASH_X100       = MAX_CRASH_MULTIPLIER * 100;   // тот же потолок в единицах crash-point (×100)
+  function clampCrash(x100){                                  // 0 (мгновенный краш) ниже потолка — не трогается
+    return x100 > MAX_CRASH_X100 ? MAX_CRASH_X100 : x100;
+  }
+
   /* ── TWO-PHASE GROWTH (RTP-neutral; only stretches the early zone) ── */
   const R1 = 0.00003, T0 = 7000, R0 = 0.00006;
   const MJOIN = Math.exp(R1 * T0);
@@ -111,13 +124,15 @@
      склейка seed-ов реальных игроков раунда (см. combineClientSeeds). При
      отсутствии аргумента поведение прежнее (константа) — обратная совместимость.
      RTP не зависит от client seed: при случайном serverSeed выход HMAC
-     равномерен для любого фиксированного сообщения. */
+     равномерен для любого фиксированного сообщения.
+     ПОСЛЕДНИМ шагом — clampCrash: сама формула не изменилась, потолок
+     накладывается на уже посчитанный честный результат. */
   function crashPointFromHash(serverSeed, clientSeed){
     const cs = clientSeed == null ? CLIENT_SEED : clientSeed;
     const hash = _hex(_hmac(_enc.encode(serverSeed), _enc.encode(cs)));
     if (divisible(hash, 40)) return 0;
     const h = parseInt(hash.slice(0, 13), 16), e = Math.pow(2, 52);
-    return Math.floor((100 * e - h) / (e - h));
+    return clampCrash(Math.floor((100 * e - h) / (e - h)));
   }
 
   /* Детерминированный порядок client seed-ов, выведенный из уже
@@ -148,6 +163,7 @@
 
   return {
     TICK_RATE, AFTER_CRASH_MS, RESTART_MS, CLIENT_SEED, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
+    MAX_CRASH_MULTIPLIER, MAX_CRASH_X100, clampCrash,
     R1, T0, R0, MJOIN,
     SYSTEM_SEED: CLIENT_SEED,   // системный seed для однослойной схемы (0 реальных игроков)
     MAX_SEEDS: 5,               // максимум client seed-ов от реальных игроков в раунде

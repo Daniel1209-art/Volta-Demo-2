@@ -35,6 +35,15 @@
     return x100 > MAX_CRASH_X100 ? MAX_CRASH_X100 : x100;
   }
 
+  /* Потолок ВЫПЛАТЫ — принципиально другой шаг: он применяется ПОСЛЕ того,
+     как честный личный множитель уже вычислен и показан игроку. Множитель
+     на экране, в истории раундов и в Provably Fair НЕ искажается — режется
+     только итоговая сумма к зачислению, и UI обязан сказать об этом явно. */
+  const MAX_PAYOUT_USD = 10000;                              // потолок выплаты за раунд, $
+  function capPayout(usd){
+    return usd > MAX_PAYOUT_USD ? MAX_PAYOUT_USD : usd;
+  }
+
   /* ── TWO-PHASE GROWTH (RTP-neutral; only stretches the early zone) ── */
   const R1 = 0.00003, T0 = 7000, R0 = 0.00006;
   const MJOIN = Math.exp(R1 * T0);
@@ -164,6 +173,7 @@
   return {
     TICK_RATE, AFTER_CRASH_MS, RESTART_MS, CLIENT_SEED, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
     MAX_CRASH_MULTIPLIER, MAX_CRASH_X100, clampCrash,
+    MAX_PAYOUT_USD, capPayout,
     R1, T0, R0, MJOIN,
     SYSTEM_SEED: CLIENT_SEED,   // системный seed для однослойной схемы (0 реальных игроков)
     MAX_SEEDS: 5,               // максимум client seed-ов от реальных игроков в раунде

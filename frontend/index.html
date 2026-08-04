@@ -935,6 +935,12 @@ input.bet-amount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   color:var(--g);margin-top:3px;font-variant-numeric:tabular-nums;text-shadow:0 0 26px var(--glow-g)}
 .win-pop-sub{font-size:11px;color:var(--t2);margin-top:5px;font-variant-numeric:tabular-nums}
 .win-pop-sub b{color:var(--gold);font-weight:700}
+/* пометка о потолке выплаты: спокойный «информационный» тон, не ошибка */
+.win-pop-cap{font-size:10px;color:var(--gold);margin-top:6px;font-weight:600;
+  background:color-mix(in srgb,var(--gold) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--gold) 28%,transparent);
+  border-radius:7px;padding:4px 8px;display:inline-block}
+.win-pop-cap[hidden]{display:none}
 .win-pop-hint{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-top:8px}
 @media(prefers-reduced-motion:reduce){.win-pop-card{transition:opacity .2s}}
 
@@ -1351,6 +1357,10 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 .ph-row:last-child{border-bottom:none}
 .ph-win{color:var(--g);font-weight:700}
 .ph-lost{color:var(--r);font-weight:700}
+/* выплата упёрлась в потолок — множитель честный, срезана только сумма */
+.ph-cap{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 32%,transparent);
+  border-radius:5px;padding:1px 4px;margin-left:4px;cursor:help}
 
 /* ═══ МЕНЮ: вкладки My Bets / Provably Fair (в модалке #profToggle) ═══ */
 .menu-box{max-width:min(94vw,520px)}
@@ -2090,6 +2100,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
     </div>
     <div class="win-pop-amt" id="winPopAmt">$0</div>
     <div class="win-pop-sub" id="winPopSub"></div>
+    <div class="win-pop-cap" id="winPopCap" hidden></div>
     <div class="win-pop-hint">tap to close</div>
   </div>
 </div>
@@ -2109,7 +2120,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
 
 /* ── SHARED ENGINE — общий модуль клиента и сервера ────────────────── */
 const { TICK_RATE, AFTER_CRASH_MS, RESTART_MS, MAX_SWITCHES, MAX_BET, DISPLAY_TICK,
-        MAX_CRASH_MULTIPLIER, clampCrash,
+        MAX_CRASH_MULTIPLIER, clampCrash, MAX_PAYOUT_USD, capPayout,
         growthFunc, inverseGrowth, crashPointFromHash, sha256hex, randHex,
         combineClientSeeds, divisible } = window.VoltaEngine;
 /* ── STATE ────────────────────────────────────────────────────────── */
@@ -2844,9 +2855,13 @@ setInterval(() => { tickTimerUI(); alignWire(); }, 100);   // тикер зао�
 
 /* ── WIN POPUP — shows the player their earnings after a winning round ── */
 let winPopTimer = null;
-function showWinPop(payout, mult, profit){
+function showWinPop(payout, mult, profit, capped){
   $('winPopAmt').innerHTML = fmt(payout, 2);
   $('winPopSub').innerHTML = `multiplier ×${mult.toFixed(2)} · profit <b>+${fmt(profit, 2)}</b>`;
+  /* информативно, не тревожно: множитель честный, ограничена только выплата */
+  const cap = $('winPopCap');
+  cap.hidden = !capped;
+  if (capped) cap.innerHTML = `payout capped at ${fmt(MAX_PAYOUT_USD, 0)} per round`;
   const p = $('winPop');
   p.hidden = false;
   requestAnimationFrame(() => p.classList.add('show'));
@@ -2961,14 +2976,20 @@ function handleCrash(){
     setStatus(`crash ×${crashMult.toFixed(2)} — lost`, 'var(--r)');
     flash('rgba(255,77,109,.2)');
   } else {
-    playerPayout = G.bet * finalPers;
+    /* множитель показываем ЧЕСТНЫЙ (он же проверяется через Provably Fair),
+       потолок применяется только к деньгам — и об этом говорим прямо, иначе
+       игрок не поймёт, почему ×N не сошлось с суммой на балансе */
+    const rawPayout = G.bet * finalPers;
+    playerPayout = capPayout(rawPayout);
+    const capped  = playerPayout < rawPayout;
     G.bal += playerPayout;
     setBadge(`payout ×${finalPers.toFixed(2)}`, 'var(--g)');
-    setStatus(`payout ${fmt(playerPayout, 2)}`, 'var(--g)');
+    setStatus(capped ? `payout ${fmt(playerPayout, 2)} · capped` : `payout ${fmt(playerPayout, 2)}`,
+              'var(--g)');
     flash('rgba(51,225,237,.12)');
     updBal();
     setTimeout(() => sfx('cashout', .9), 300);   // «касса» после звона стекла
-    showWinPop(playerPayout, finalPers, playerPayout - G.bet);   // popup with the player's earnings
+    showWinPop(playerPayout, finalPers, playerPayout - G.bet, capped);   // popup with the player's earnings
   }
   showRoundWinnings(playerPayout);   // total table winnings for the round
 
@@ -3367,9 +3388,11 @@ function renderLive(curMult){
 
 /* total table winnings (everyone OFF at crash) — shown when the round ends */
 function showRoundWinnings(playerPayout){
-  const botsWin = bots.reduce((s, b) => s + (b.win ? b.bet * b.finalMult : 0), 0);
+  /* потолок применяется к КАЖДОМУ игроку отдельно, а не к сумме: иначе
+     итог по столу противоречил бы правилу «до $10 000 за раунд» */
+  const botsWin = bots.reduce((s, b) => s + (b.win ? capPayout(b.bet * b.finalMult) : 0), 0);
   const peersWin = [...G.peers.values()].reduce((s, p) =>
-    s + (p.win && p.bet && p.finalMult != null ? p.bet * p.finalMult : 0), 0);
+    s + (p.win && p.bet && p.finalMult != null ? capPayout(p.bet * p.finalMult) : 0), 0);
   const total = botsWin + peersWin + (playerPayout || 0);
   const el = $('lbRoundWin');
   el.innerHTML = `Total round win: <b>${fmt(total, 2)}</b>`;
@@ -3581,14 +3604,19 @@ function renderMyHistory(m){
       <p style="color:var(--t3);font-size:10px">History resets daily (${m.tz || 'UTC'}).</p>`;
     return;
   }
-  const rows = m.rows.map(r => `
+  /* в истории та же логика, что в попапе: множитель честный, сумма может быть
+     срезана потолком — помечаем, иначе строка выглядит арифметически неверной */
+  const rows = m.rows.map(r => {
+    const capped = r.win && r.payout < r.amount * r.finalMult - 1e-6;
+    return `
     <div class="ph-row">
       <span>#${r.roundId}</span>
       <span>${fmt(r.amount, 0)}</span>
       <span>×${r.finalMult.toFixed(2)}</span>
       <span class="${r.win ? 'ph-win' : 'ph-lost'}">${r.win ? 'WIN' : 'LOST'}</span>
-      <span>${r.win ? fmt(r.payout, 2) : '—'}</span>
-    </div>`).join('');
+      <span>${r.win ? fmt(r.payout, 2) + (capped ? ' <b class="ph-cap" title="payout capped at '
+        + fmt(MAX_PAYOUT_USD, 0) + ' per round">cap</b>' : '') : '—'}</span>
+    </div>`; }).join('');
   b.innerHTML = `
     <div class="ph-head"><span>round</span><span>bet</span><span>exit ×</span><span>result</span><span>payout</span></div>
     ${rows}

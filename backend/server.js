@@ -546,7 +546,9 @@ function crashRound(){
       p.win = true;
     }
     p.settled = true;
-    const payout = p.win ? p.bet * p.finalMult : 0;
+    /* потолок выплаты — ПОСЛЕДНИЙ шаг: final_mult в аналитике остаётся
+       честным, режется только сумма (см. docs/analytics.md) */
+    const payout = p.win ? E.capPayout(p.bet * p.finalMult) : 0;
     q.addBet.run(p.id, R.roundId, today, p.bet, p.finalMult, p.win ? 1 : 0, payout, Date.now(),
                  p.sessionId, R.crashPoint, p.cashoutMult,
                  E.MAX_SWITCHES - p.switchesLeft, p.onCount, p.offCount,

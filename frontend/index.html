@@ -2021,8 +2021,11 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
       <h3>Crash</h3>
       <p><span class="hl-on">Lamp ON at the crash:</span> your bet burns.</p>
       <p><span class="hl-off">Lamp OFF at the crash:</span> you get bet &times; personal multiplier.</p>
+      <h3>Limits</h3>
+      <p>A round never climbs above <span class="hl-p">&times;10,000</span> &mdash; that's the highest multiplier the game can reach.</p>
+      <p>A win pays at most <span class="hl-p">$10,000</span> per round. Your multiplier stays exactly as shown &mdash; only the amount is capped, and we mark it when that happens.</p>
       <h3>Re-toggling</h3>
-      <p>You can switch the lamp on up to <span class="hl-p">4 times</span> per round. Each turn-on keeps stacking the multiplier on top of the previous one.</p>
+      <p>You can switch the lamp on up to <span class="hl-p">2 times</span> per round. Each turn-on keeps stacking the multiplier on top of the previous one.</p>
       <h3>Autoplay</h3>
       <p>Set the values and the lamp toggles automatically at the right moments — handy for a pre-planned strategy.</p>
     </div>
@@ -2059,7 +2062,7 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         <h3>Check the round hash</h3>
         <p>Take the revealed server seed, compute its SHA-256 yourself (the <b>Verify</b> button below does it in your browser with <code>crypto.subtle</code>), and compare it to the hash shown before the round. They must match.</p>
         <h3>Check the multiplier</h3>
-        <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. That HMAC decides everything: 1 round in 40 ends instantly at ×1.00, and in every other round the first 13 hex digits of the HMAC become a number <code>h</code> that sets the multiplier — <code>floor((100·2^52 − h) / (2^52 − h))/100</code>. Verify recomputes this locally and compares — no third-party site needed.</p>
+        <p>The crash multiplier comes from <code>HMAC-SHA256(key = server seed, message = client seeds joined by "-")</code>. That HMAC decides everything: 1 round in 40 ends instantly at ×1.00, and in every other round the first 13 hex digits of the HMAC become a number <code>h</code> that sets the multiplier — <code>floor((100·2^52 − h) / (2^52 − h))/100</code>. The result is then capped at <b>×10,000</b> — the cap is applied last, on top of the fair result, and <b>Verify</b> applies exactly the same cap, so a capped round still matches. Verify recomputes all of this locally — no third-party site needed.</p>
         <div class="pf-mine">
           <div class="pf-mine-lbl">Current round hash &#8212; published before the round starts</div>
           <div class="pf-seedrow">

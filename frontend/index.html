@@ -1837,8 +1837,9 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
         </div>
         <div class="lamp-info-col">
           <div class="state-badge" id="stateBadge">&#9679; idle</div>
+          <!-- точек ровно MAX_SWITCHES; красит updSwitches() -->
           <div class="sw-row" id="swRow">
-            <div class="sw u"></div><div class="sw u"></div><div class="sw u"></div><div class="sw u"></div>
+            <div class="sw u"></div><div class="sw u"></div>
           </div>
           <div class="pers-box">
             <div class="pers-lbl">personal &times;</div>
@@ -1906,19 +1907,9 @@ button:focus-visible,.qb:focus-visible,.bet-btn:focus-visible,.lbtn:focus-visibl
             <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff2" type="text" inputmode="decimal" value="2.50" step="any" min="1.01" onchange="renderAutoStatus()"></div>
             <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn2" type="text" inputmode="decimal" value="3.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
           </div>
-          <div class="astage" id="autoStage3">
-            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn3" checked onchange="renderAutoStatus()"><span class="as-num">3</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff3" type="text" inputmode="decimal" value="4.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn3" type="text" inputmode="decimal" value="5.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-          </div>
-          <div class="astage" id="autoStage4">
-            <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoStageEn4" checked onchange="renderAutoStatus()"><span class="as-num">4</span></label>
-            <div class="as-field"><label class="as-lbl off">off &times;</label><input class="as-input off-in" id="autoOff4" type="text" inputmode="decimal" value="7.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-            <div class="as-field"><label class="as-lbl on">on &times;</label><input class="as-input on-in" id="autoOn4" type="text" inputmode="decimal" value="8.00" step="any" min="1.01" onchange="renderAutoStatus()"></div>
-          </div>
         </div>
         <div class="auto-final" id="autoFinalRow">
-          <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoFinalEn" checked onchange="renderAutoStatus()"><span class="as-num">5</span></label>
+          <label class="as-num-tog"><input type="checkbox" class="stage-en" id="autoFinalEn" checked onchange="renderAutoStatus()"><span class="as-num">3</span></label>
           <div class="as-field">
             <label class="as-lbl off">final off &times;</label>
             <input class="as-input off-in" id="autoFinalOff" type="text" inputmode="decimal" value="12.00" step="any" min="1.01" onchange="renderAutoStatus()">
@@ -3151,7 +3142,8 @@ function parseDec(v){
 }
 function buildAutoActions(){
   const acts = [];
-  for (let n = 1; n <= 4; n++){
+  /* ступеней ровно столько, сколько повторных ON разрешает движок */
+  for (let n = 1; n <= MAX_SWITCHES; n++){
     if (!$('autoStageEn' + n).checked) continue;
     const off = parseDec($('autoOff' + n).value);
     const onV = parseDec($('autoOn' + n).value);
@@ -3859,7 +3851,8 @@ try {
       'autoToggle(шторка)=' + (document.getElementById('autoToggle') || {}).checked +
         '  autoEnable=' + (document.getElementById('autoEnable') || {}).checked +
         '  sndToggle=' + (document.getElementById('sndToggle') || {}).checked,
-      'stage1..4=' + [1, 2, 3, 4].map(n => (document.getElementById('autoStageEn' + n) || {}).checked).join(','),
+      'stages=' + Array.from({ length: MAX_SWITCHES }, (_, i) =>
+        (document.getElementById('autoStageEn' + (i + 1)) || {}).checked).join(','),
       '',
       '── доступность (центр элемента) ──',
       topAt('autoOff1'), topAt('autoOn1'), topAt('autoEnable'), topAt('autoStageEn1'), topAt('betBtn'),

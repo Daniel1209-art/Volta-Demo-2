@@ -154,4 +154,41 @@ console.log(`  MAX_CRASH_MULTIPLIER = ×${E.MAX_CRASH_MULTIPLIER} (crash-point �
   ok(/p\.finalMult = p\.persAccum;/.test(srv), 'сервер пишет в аналитику НЕтронутый final_mult');
 }
 
+/* 7) лимит переключений: UI обязан совпадать с константой движка.
+   Расхождение здесь тихое и потому опасное — игрок увидит поле или точку,
+   которая никогда не сработает, а сервер молча отклонит переключение. */
+{
+  console.log(`\n  MAX_SWITCHES = ${E.MAX_SWITCHES}`);
+  const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+
+  const row = html.slice(html.indexOf('id="swRow"'), html.indexOf('id="swRow"') + 400);
+  const dots = (row.slice(0, row.indexOf('</div>\n')).match(/class="sw u"/g) || []).length;
+  ok(dots === E.MAX_SWITCHES, `точек в индикаторе ${dots} == MAX_SWITCHES`);
+
+  const stages = (html.match(/class="astage" id="autoStage\d+"/g) || []).length;
+  ok(stages === E.MAX_SWITCHES, `ступеней автопилота ${stages} == MAX_SWITCHES`);
+
+  for (let n = 1; n <= E.MAX_SWITCHES; n++)
+    ok(html.includes(`id="autoOff${n}"`) && html.includes(`id="autoOn${n}"`),
+       `ступень ${n}: поля off/on на месте`);
+  ok(!html.includes(`id="autoStage${E.MAX_SWITCHES + 1}"`),
+     'лишних (задизейбленных/пустых) ступеней в разметке нет');
+
+  /* «те же 3 поля OFF»: по одному на ступень + Final OFF */
+  const offs = (html.match(/class="as-input off-in"/g) || []).length;
+  ok(offs === E.MAX_SWITCHES + 1, `полей OFF ${offs} = ${E.MAX_SWITCHES} ступеней + Final OFF`);
+  ok(html.includes('id="autoFinalOff"'), 'Final OFF сохранён');
+
+  ok(/for \(let n = 1; n <= MAX_SWITCHES; n\+\+\)/.test(html),
+     'сборка плана автопилота завязана на константу, а не на число');
+  ok(!/for \(let n = 1; n <= \d/.test(html), 'жёсткого числа ступеней в коде не осталось');
+
+  const srv = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  ok(/p\.switchesLeft = E\.MAX_SWITCHES/.test(srv), 'сервер берёт лимит из движка');
+  ok(/p\.lampOn \|\| p\.switchesLeft <= 0/.test(srv), 'серверный гейт переключений на месте');
+
+  const backup = path.join(__dirname, '..', 'docs', 'lamp-switches-4.backup.md');
+  ok(fs.existsSync(backup), 'бэкап конфигурации на 4 переключения существует');
+}
+
 console.log(`\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ (${passed})\n`);

@@ -18,7 +18,9 @@
   const AFTER_CRASH_MS = 3000;
   const RESTART_MS     = 5000;
   const CLIENT_SEED    = '000000000000000007a9a31ff7f07463d91af6b5454241d5faf282e5e0fe1b3a';
-  const MAX_SWITCHES   = 4;
+  /* повторные включения лампы за раунд; бесплатный стартовый ON лимит не тратит.
+     Было 4 до 2026-08-04 — как вернуть, см. docs/lamp-switches-4.backup.md */
+  const MAX_SWITCHES   = 2;
   const MAX_BET        = 100;      // максимальная ставка игрока — $100
   const DISPLAY_TICK   = 50;
 

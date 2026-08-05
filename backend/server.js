@@ -205,9 +205,15 @@ const IP_SALT = (() => {
   return s;
 })();
 function clientIp(req){
-  /* за nginx реальный адрес приходит в X-Forwarded-For; первый элемент — клиент */
-  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return xff || req.socket.remoteAddress || '';
+  /* За ДОВЕРЕННЫМ прокси (nginx; при включённом Cloudflare — с восстановлением
+     real-ip, см. deploy/nginx) реальный адрес — это ПОСЛЕДНИЙ элемент XFF, тот,
+     что дописал сам nginx ($remote_addr). Клиентский X-Forwarded-For, если он
+     был, оказывается ЛЕВЕЕ, и брать [0] нельзя: заголовок подделывается тривиально,
+     а этим ключуется лимитер входа в дашборд — подделкой XFF его обходили (свежая
+     корзина на каждый запрос). Берём хвост списка: nginx ставит его последним. */
+  const parts = String(req.headers['x-forwarded-for'] || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  return (parts.length ? parts[parts.length - 1] : '') || req.socket.remoteAddress || '';
 }
 function ipHash(ip){ return ip ? crypto.createHash('sha256').update(IP_SALT + '|' + ip).digest('hex') : null; }
 

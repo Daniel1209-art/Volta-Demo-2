@@ -49,6 +49,24 @@ const RETENTION_DAYS  = parseInt(process.env.RETENTION_DAYS || '35', 10);
 const SESSION_IDLE_MS = parseInt(process.env.SESSION_IDLE_MS || String(30 * 60 * 1000), 10);
 const GEOIP_CSV       = process.env.GEOIP_CSV || path.join(__dirname, '..', 'data', 'geoip.csv');
 
+/* ── ЗАЩИТА WS ОТ ФЛУДА (публичный запуск) ────────────────────────────
+   Сам транспорт /ws наружу открыт для кого угодно, поэтому три дешёвых
+   ограничителя:
+   - размер кадра: осмысленное сообщение (hello с 64-символьными clientId+seed)
+     занимает сотни байт; 16 КБ — потолок с запасом, гигантский кадр отсекает
+     ws до нашего кода, экономя память на JSON.parse;
+   - соединения на IP: игрок с несколькими вкладками сюда не упирается, а
+     тысячи соединений с одного хоста — да (за Cloudflare это IP реального
+     клиента, см. real_ip в nginx);
+   - частота сообщений на соединение: токен-бакет, легитимный клиент шлёт
+     единицы сообщений в секунду и лимита не видит, флуд — режется, а
+     упорный флуд рвёт соединение. */
+const WS_MAX_FRAME_BYTES  = parseInt(process.env.WS_MAX_FRAME_BYTES  || '16384', 10);
+const WS_MAX_CONN_PER_IP  = parseInt(process.env.WS_MAX_CONN_PER_IP  || '50', 10);
+const WS_MSG_PER_SEC      = parseInt(process.env.WS_MSG_PER_SEC      || '25', 10);
+const WS_MSG_BURST        = parseInt(process.env.WS_MSG_BURST        || '50', 10);
+const WS_MSG_DROP_LIMIT   = parseInt(process.env.WS_MSG_DROP_LIMIT   || '200', 10);
+
 function loadDotEnv(file){
   try {
     for (const line of fs.readFileSync(file, 'utf8').split('\n')){
@@ -706,12 +724,28 @@ const server = http.createServer((req, res) => {
 });
 
 /* ── WEBSOCKET ────────────────────────────────────────────────────── */
-wss = new WebSocketServer({ server, path: '/ws' });
+wss = new WebSocketServer({ server, path: '/ws', maxPayload: WS_MAX_FRAME_BYTES });
+const connByIp = new Map();   // ip_hash → число живых соединений (флуд-лимит)
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   /* сырой IP дальше этой строки не живёт: в замыкании остаются только хеш и гео */
   const net = (() => { const ip = clientIp(req); return { hash: ipHash(ip), ...geoLookup(ip) }; })();
+  /* лимит соединений на IP — до любой другой работы. Отклонённое соединение
+     НЕ инкрементит счётчик, поэтому декремент в close ему не нужен. */
+  if (net.hash){
+    const cur = connByIp.get(net.hash) || 0;
+    if (cur >= WS_MAX_CONN_PER_IP){ try { ws.close(1013, 'too many connections'); } catch (e) {} return; }
+    connByIp.set(net.hash, cur + 1);
+    ws.ipHashKey = net.hash;
+  }
+  /* токен-бакет частоты сообщений (см. WS_MSG_* выше) */
+  ws.msgTokens = WS_MSG_BURST; ws.msgLast = Date.now(); ws.msgDrops = 0;
+  /* ОБЯЗАТЕЛЬНО: без слушателя 'error' любая ошибка сокета (превышение
+     maxPayload, битый кадр, обрыв соединения) — это unhandled 'error' на
+     EventEmitter, а он роняет ВЕСЬ процесс. То есть один кривой кадр от
+     кого угодно клал бы игру всем. Гасим здесь: соединение и так закроется. */
+  ws.on('error', (e) => { console.error('ws error:', e && e.message); });
   ws.on('pong', () => {
     ws.isAlive = true;
     if (ws.sessionId) q.touchSess.run(Date.now(), ws.sessionId);   // ws-пинг раз в 30 с двигает «время в игре»
@@ -719,6 +753,18 @@ wss.on('connection', (ws, req) => {
   let me = null;                       // P после hello
 
   ws.on('message', (raw) => {
+    /* частотный лимит ДО JSON.parse: не жжём CPU на разбор флуда. Токен-бакет
+       пополняется по времени; нет токена — сообщение отбрасывается, а упорный
+       флудер (свыше WS_MSG_DROP_LIMIT отброшенных) отключается. */
+    const now = Date.now();
+    ws.msgTokens = Math.min(WS_MSG_BURST, ws.msgTokens + (now - ws.msgLast) * WS_MSG_PER_SEC / 1000);
+    ws.msgLast = now;
+    if (ws.msgTokens < 1){
+      if (++ws.msgDrops > WS_MSG_DROP_LIMIT){ try { ws.terminate(); } catch (e) {} }
+      return;
+    }
+    ws.msgTokens -= 1;
+
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
     if (typeof msg !== 'object' || !msg) return;
@@ -762,6 +808,12 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    /* освобождаем слот флуд-лимита — до раннего return, ведь соединение могли
+       закрыть и до hello (me == null), а слот оно всё равно занимало */
+    if (ws.ipHashKey){
+      const n = (connByIp.get(ws.ipHashKey) || 1) - 1;
+      if (n <= 0) connByIp.delete(ws.ipHashKey); else connByIp.set(ws.ipHashKey, n);
+    }
     if (!me) return;
     me.sockets.delete(ws);
     /* состояние раунда держим до конца раунда даже при обрыве —

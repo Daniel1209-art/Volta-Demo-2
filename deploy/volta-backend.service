@@ -13,6 +13,9 @@ WorkingDirectory=/var/www/volta-demo.com/backend
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=3
+# Каждый WS-игрок держит открытый файловый дескриптор. Дефолт systemd (1024)
+# стал бы потолком одновременных игроков при всплеске с Reddit; поднимаем.
+LimitNOFILE=16384
 Environment=NODE_ENV=production
 Environment=DB_PATH=/var/www/volta-demo.com/data/volta.db
 # .env (необязательный) может переопределить PORT/RESET_TZ и т.д.
